@@ -74,7 +74,7 @@ Git-based workspaces
 
 ## Prior Art
 
-Origin of this project started when I wrote [repogen](https://www.npmjs.com/package/repo-genesis-cli). While this is still used internally, it's outdated & lacks features
+Origin of this project started when I wrote [repogen](https://www.npmjs.com/package/repo-genesis-cli). While this is still used internally, it's outdated & lacks features. We ended up using submodules last year and remembered some of [the pain](https://www.youtube.com/watch?v=RFcc-BQjCsE) associated with an otherwise convenient feature. Ultimately wanted something that would allow a team of devs to have a consistent directory structure without being beholden to the all-mighty monolith
 
 There are number of notable options in the monolith/package management space, ranging from pure workspaces to interactive build systems
 
@@ -134,4 +134,3 @@ Few notable examples:
   - Create repo labels automagically ()
     >   eg. "foo", "bar" repos cloned. `${opt-label-prefix}-${reponame}-${opt-label-suffix}` generated on Github and Gitea
   - Show visual of dependency graph of repo structure
-
