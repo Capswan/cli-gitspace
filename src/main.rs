@@ -1,8 +1,15 @@
 //! Gitspace
 use clap::{Parser, Subcommand};
-use std::fs::File;
+use std::fs;
 use std::io::prelude::*;
-use std::path::{Path, PathBuf};
+use std::path::Path;
+use serde;
+use serde_json::{json};
+
+mod config;
+use config::ConfigTemplate;
+
+const GITSPACE: &str = ".gitspace";
 
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
@@ -20,55 +27,22 @@ enum SubCommand {
     Sync,
 }
 
-const TEMPLATE: &str = r#"
-    {
-        "ssh": {
-            "host": "github",
-            "hostName": "github.com",
-            "user": "git",
-            "identityFile": "~/.ssh/id_rsa",
-        },
-        "repositories": [
-            { "capswan": "cli" }
-        ],
-        "sync": {
-            "enabled": "true"
-            "cron": "30 0 * * *",
-        }
-    }
-"#;
-
-/// Refers to your ~/.ssh/config file
-/// Struct parameters example:
-/// Host github
-///    HostName github.com
-///    User git
-///    IdentityFile ~/.ssh/id_rsa
-struct SSH {
-    host: String,
-    host_name: String,
-    user: String,
-    identity_file: String,
-}
-
-/// Single repository within an array of repositories inside the .gitspace file
-/// Struct parameters example:
-/// - github.com/capswan/cli-gitspace
-/// - github.com/{namespace}/{repository}
-struct Repository {
-    namespace: String,
-    project: String,
-}
-
-struct Sync {
-    enabled: bool,
-    cron: String,
-}
-
-const GITSPACE: &str = ".gitspace";
-
 fn path_exists(path: &str) -> bool {
     Path::new(path).try_exists().unwrap()
+}
+
+fn create_file(path: &str, content: &str) -> fs::File {
+    // create a .gitspace file in the current working directory
+    let mut template = config::Config::default();
+
+    let mut file = fs::File::create(path).unwrap();
+    // write the default config to it
+    file.write_all(content.as_bytes()).unwrap();
+    file
+}
+
+fn delete_file(path: &str) {
+    fs::remove_file(path).unwrap();
 }
 
 fn main() {
@@ -80,10 +54,14 @@ fn main() {
             if path_exists(GITSPACE) {
                 println!("gitspace already exists");
             } else {
-                // create a .gitspace file in the current working directory
-                let mut file = File::create(GITSPACE).unwrap();
-                // write the default config to it
-                file.write_all(TEMPLATE.as_bytes()).unwrap();
+                // Grab default template
+                let template = config::Config::default();
+                
+                // Convert default template
+                let template_str = template.to_str();
+
+                // Create .gitspace and write the default template to it
+                create_file(GITSPACE, template_str.as_str());
             }
         }
         SubCommand::Sync {} => {
@@ -97,8 +75,27 @@ mod tests {
     use super::*;
 
     #[test]
-    fn serde_can_parse_gitspace() {
-        assert_eq!(path_exists("src/main.rs"), true);
-        assert_eq!(path_exists("src/main.rsx"), false);
+    fn gitspace_is_generated() {
+        let mut template: serde_json::Value = json!({
+            "ssh": {
+                "host": "github",
+                "hostName": "github.com",
+                "user": "git",
+                "identityFile": "~/.ssh/id_rsa"
+            },
+            "repositories": [
+                {
+                    "namespace": "capswan",
+                    "project": "cli-gitspace"
+                }
+            ],
+            "sync": {
+                "enabled": true,
+                "cron": "30 0 * * *"
+            }
+        });
+
+        create_file(GITSPACE, serde_json::to_string(&template).unwrap().as_str());
+        assert_eq!(path_exists(GITSPACE), true);
     }
 }
