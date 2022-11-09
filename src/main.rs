@@ -53,6 +53,9 @@ fn main() {
             // if the config file already exists, do nothing
             if path_exists(GITSPACE) {
                 println!("gitspace already exists");
+                //TODO: Prompt the user to create new .gitspace
+                //TODO: Move previous .gitspace to .gitspace.bak
+                //TODO: Prompt user to select from gitspace template or interactive
             } else {
                 // Grab default template
                 let template = config::Config::default();
@@ -65,7 +68,11 @@ fn main() {
             }
         }
         SubCommand::Sync {} => {
-            println!("sync");
+            //TODO: Iterate through every repository
+            //TODO: Clone each repository if it doesn't exist
+            //TODO: Pull each repository if it does exist
+            //TODO: Print a list of repositories and their status
+            todo!();
         }
     }
 }
