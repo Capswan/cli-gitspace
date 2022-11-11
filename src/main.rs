@@ -1,13 +1,13 @@
 //! Gitspace
 use clap::{Parser, Subcommand};
+// use serde;
+use serde_json::json;
 use std::fs;
 use std::io::prelude::*;
 use std::path::Path;
-use serde;
-use serde_json::{json};
 
 mod config;
-use config::ConfigTemplate;
+use config::{ConfigFile, ConfigTemplate};
 
 const GITSPACE: &str = ".gitspace";
 
@@ -27,20 +27,6 @@ enum SubCommand {
     Sync,
 }
 
-fn path_exists(path: &str) -> bool {
-    Path::new(path).try_exists().unwrap()
-}
-
-fn create_file(path: &str, content: &str) -> fs::File {
-    // create a .gitspace file in the current working directory
-    let mut template = config::Config::default();
-
-    let mut file = fs::File::create(path).unwrap();
-    // write the default config to it
-    file.write_all(content.as_bytes()).unwrap();
-    file
-}
-
 fn delete_file(path: &str) {
     fs::remove_file(path).unwrap();
 }
@@ -49,23 +35,11 @@ fn main() {
     let args = Arguments::parse();
     match args.cmd {
         SubCommand::Init {} => {
-            println!("init");
-            // if the config file already exists, do nothing
-            if path_exists(GITSPACE) {
-                println!("gitspace already exists");
-                //TODO: Prompt the user to create new .gitspace
-                //TODO: Move previous .gitspace to .gitspace.bak
-                //TODO: Prompt user to select from gitspace template or interactive
-            } else {
-                // Grab default template
-                let template = config::Config::default();
-                
-                // Convert default template
-                let template_str = template.to_str();
+            // Grab default template
+            // let template = config::Config::default();
 
-                // Create .gitspace and write the default template to it
-                create_file(GITSPACE, template_str.as_str());
-            }
+            // Create .gitspace and write the default template to it
+            config::Config::new();
         }
         SubCommand::Sync {} => {
             //TODO: Iterate through every repository
@@ -80,10 +54,12 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use config::{Config, ConfigFile, ConfigTemplate};
 
     #[test]
     fn gitspace_is_generated() {
         let mut template: serde_json::Value = json!({
+            "path": ".gitspace",
             "ssh": {
                 "host": "github",
                 "hostName": "github.com",
@@ -101,8 +77,10 @@ mod tests {
                 "cron": "30 0 * * *"
             }
         });
-
-        create_file(GITSPACE, serde_json::to_string(&template).unwrap().as_str());
-        assert_eq!(path_exists(GITSPACE), true);
+        // Convert template from JSON to a Config
+        let deserialized = serde_json::to_value(&template).unwrap();
+        let config = deserialized.to_config();
+        let config_generated = Config::new();
+        assert_eq!(Config::exists(&config), true);
     }
 }
