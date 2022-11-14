@@ -58,7 +58,7 @@ mod tests {
 
     #[test]
     fn gitspace_is_generated() {
-        let mut template: serde_json::Value = json!({
+        let template: serde_json::Value = json!({
             "path": ".gitspace",
             "ssh": {
                 "host": "github",
@@ -80,7 +80,7 @@ mod tests {
         // Convert template from JSON to a Config
         let deserialized = serde_json::to_value(&template).unwrap();
         let config = deserialized.to_config();
-        let config_generated = Config::new();
+        // exists checks the path stored on Config; ie. ".gitspace"
         assert_eq!(Config::exists(&config), true);
     }
 }

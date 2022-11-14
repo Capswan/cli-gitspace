@@ -3,6 +3,7 @@ use serde_json::Value;
 use std::fs::{write, File};
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
+// use std::convert::From;
 
 /// Refers to your ~/.ssh/config file
 /// Struct parameters example:
@@ -68,6 +69,7 @@ impl Default for Config {
     }
 }
 
+
 pub trait ConfigFile {
     //TODO: Remove wonky workaround with &self (for .gitspace path)
     fn new() -> Self;
@@ -77,7 +79,7 @@ pub trait ConfigFile {
 
 impl ConfigFile for Config {
     /// Create a new .gitspace file in the current working directory
-    fn new()-> Self{
+    fn new() -> Self {
         let config = Self::default();
         write(&config.path, &config.to_str());
         config
@@ -147,7 +149,6 @@ mod tests {
 
     #[test]
     fn can_read_config() {
-
         let config = Config::new();
         let config_file = Config::read_config(&config);
         assert_eq!(config_file, serde_json::to_value(&config).unwrap());
