@@ -1,15 +1,10 @@
 //! Gitspace
 use clap::{Parser, Subcommand};
-// use serde;
-use serde_json::json;
-use std::fs;
 use std::io::prelude::*;
 use std::path::Path;
 
 mod config;
 use config::{ConfigFile, ConfigTemplate};
-
-const GITSPACE: &str = ".gitspace";
 
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
@@ -25,10 +20,6 @@ struct Arguments {
 enum SubCommand {
     Init,
     Sync,
-}
-
-fn delete_file(path: &str) {
-    fs::remove_file(path).unwrap();
 }
 
 fn main() {
@@ -48,39 +39,5 @@ fn main() {
             //TODO: Print a list of repositories and their status
             todo!();
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use config::{Config, ConfigFile, ConfigTemplate};
-
-    #[test]
-    fn gitspace_is_generated() {
-        let template: serde_json::Value = json!({
-            "path": ".gitspace",
-            "ssh": {
-                "host": "github",
-                "hostName": "github.com",
-                "user": "git",
-                "identityFile": "~/.ssh/id_rsa"
-            },
-            "repositories": [
-                {
-                    "namespace": "capswan",
-                    "project": "cli-gitspace"
-                }
-            ],
-            "sync": {
-                "enabled": true,
-                "cron": "30 0 * * *"
-            }
-        });
-        // Convert template from JSON to a Config
-        let deserialized = serde_json::to_value(&template).unwrap();
-        let config = deserialized.to_config();
-        // exists checks the path stored on Config; ie. ".gitspace"
-        assert_eq!(Config::exists(&config), true);
     }
 }
