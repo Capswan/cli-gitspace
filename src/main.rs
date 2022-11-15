@@ -1,10 +1,8 @@
 //! Gitspace
+// use std::io::prelude::*;
 use clap::{Parser, Subcommand};
-use std::io::prelude::*;
-use std::path::Path;
-
 mod config;
-use config::{ConfigFile, ConfigTemplate};
+use config::{Config, ConfigFile, ConfigParser, Paths};
 
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
@@ -26,18 +24,14 @@ fn main() {
     let args = Arguments::parse();
     match args.cmd {
         SubCommand::Init {} => {
-            // Grab default template
-            // let template = config::Config::default();
-
             // Create .gitspace and write the default template to it
-            config::Config::new();
+            Config::new();
         }
         SubCommand::Sync {} => {
-            //TODO: Iterate through every repository
-            //TODO: Clone each repository if it doesn't exist
-            //TODO: Pull each repository if it does exist
-            //TODO: Print a list of repositories and their status
-            todo!();
+            //TODO: Read config path from CLI flag if it exists, otherwise use Paths::default()
+            let paths = Paths::default();
+            let config = Config::read_config_raw(&paths.config);
+            config.clone_repos();
         }
     }
 }

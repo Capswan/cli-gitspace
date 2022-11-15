@@ -1,6 +1,6 @@
 use git2::Repository;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::Value;
 use std::fs::{create_dir_all, remove_dir_all, remove_file, write, File};
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
@@ -14,7 +14,7 @@ const GITSPACE: &str = ".gitspace";
 ///    IdentityFile ~/.ssh/id_rsa
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct Ssh {
+struct Ssh {
     host: String,
     host_name: String,
     user: String,
@@ -51,15 +51,25 @@ pub struct Config {
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Paths {
-    space: PathBuf,
-    config: PathBuf,
-    repositories: PathBuf,
+    pub space: PathBuf,
+    pub config: PathBuf,
+    pub repositories: PathBuf,
 }
 
-enum PathType {
+pub enum PathType {
     Space,
     Config,
     Repositories,
+}
+
+impl Default for Paths {
+    fn default() -> Self {
+        Paths {
+            space: PathBuf::from(".gitspace"),
+            config: PathBuf::from(".gitspace/config.json"),
+            repositories: PathBuf::from(".gitspace/repositories"),
+        }
+    }
 }
 
 impl Default for Config {
@@ -91,7 +101,8 @@ impl Default for Config {
 pub trait ConfigFile {
     fn new() -> Self;
     fn exists(&self, path: PathType) -> bool;
-    fn read_config(&self) -> Value;
+    fn read_config_raw(config_path: &PathBuf) -> Config;
+    fn read_config(config_path: &PathBuf) -> Value;
     fn rm_config(&self);
     fn rm_repositories(&self);
     fn rm_space(&self);
@@ -112,31 +123,39 @@ impl ConfigFile for Config {
             PathType::Space => Path::new(&self.paths.space).exists(),
             PathType::Config => Path::new(&self.paths.config).exists(),
             PathType::Repositories => Path::new(&self.paths.repositories).exists(),
-            _ => false,
         }
     }
 
     /// Return a JSON value of the .gitspace file
-    fn read_config(&self) -> Value {
-        let file = File::open(&self.paths.config).unwrap();
+    fn read_config(config_path: &PathBuf) -> Value {
+        let file = File::open(&config_path).unwrap();
         let reader = BufReader::new(file);
         let value: Value = serde_json::from_reader(reader).unwrap();
         value
     }
 
+    /// Return a Config struct of the .gitspace file
+    fn read_config_raw(config_path: &PathBuf) -> Config {
+        let file = File::open(&config_path).unwrap();
+        let reader = BufReader::new(file);
+        let config: Config = serde_json::from_reader(reader).unwrap();
+        config
+    }
     /// remove the .gitspace/config.json file
     fn rm_config(&self) {
+        println!("Removing {}", &self.paths.config.display());
         remove_file(&self.paths.config).unwrap();
     }
 
     /// remove the .gitspace/repositories directory
     fn rm_repositories(&self) {
-        // remove_file(&self.paths.repositories).unwrap();
+        println!("Removing {}", &self.paths.repositories.display());
         remove_dir_all(&self.paths.repositories).unwrap();
     }
 
     /// remove the .gitspace directory
     fn rm_space(&self) {
+        println!("Removing {}", &self.paths.space.display());
         remove_dir_all(&self.paths.space).unwrap();
     }
 }
@@ -185,20 +204,28 @@ impl ConfigTemplate for String {
     }
 }
 
-trait ConfigParser {
+pub trait ConfigParser {
     fn clone_repos(&self);
 }
 
 impl ConfigParser for Config {
     fn clone_repos(&self) {
+        //TODO: Iterate through every repository
+        //TODO: Clone each repository if it doesn't exist
+        //TODO: Pull each repository if it does exist
+        //TODO: Print a list of repositories and their status
+
         self.clone().repositories.into_iter().map(|repo| {
             let url = format!(
                 "git@{}:{}/{}.git",
                 &self.ssh.host_name, repo.namespace, repo.project
             );
             let path = format!("{}/{}/{}", ".gitspace", ".repos", repo.project);
+            // println!("")
             Repository::clone(&url, path).unwrap();
         });
+        // TODO: Implement FromIter on Config::Repo
+        // .collect::<Repo>();
     }
 }
 
@@ -208,7 +235,7 @@ mod tests {
 
     #[test]
     fn gitspace_is_generated() {
-        let template: serde_json::Value = json!({
+        let template: Value = serde_json::json!({
             "paths": {
                 "space": ".gitspace",
                 "config": ".gitspace/config.json",
@@ -235,14 +262,18 @@ mod tests {
         let deserialized = serde_json::to_value(&template).unwrap();
         let config = deserialized.to_config();
         // exists checks the path stored on Config; ie. ".gitspace"
-        let config_exists = Config::exists(&config, PathType::Space);
+        let config_exists = config.exists(PathType::Space);
         assert!(config_exists);
+
+        // Comment this out to toggle the removal of the .gitspace directory
+        // config.rm_space();
+        // assert_eq!(config.exists(PathType::Space), false);
     }
 
     #[test]
     fn can_read_config() {
         let config = Config::new();
-        let config_file = Config::read_config(&config);
+        let config_file = Config::read_config(&config.paths.config);
         assert_eq!(config_file, serde_json::to_value(&config).unwrap());
     }
     /// Creating a raw Config, converting it to a JSON Value, and then comparing it to Default Config type
@@ -274,22 +305,11 @@ mod tests {
         assert_eq!(config_default_json, config_raw.to_json());
     }
 
-    #[test]
-    fn clone_repos() {
-        let config = Config::new();
-        let repos = config.clone_repos();
-        println!("{:?}", repos);
-        // assert_eq!(repos, config.repositories);
-    }
-
-    #[test]
-    fn cleanup() {
-        let config = Config::new();
-        config.rm_config();
-        assert_eq!(config.exists(PathType::Config), false);
-        config.rm_repositories();
-        assert_eq!(config.exists(PathType::Repositories), false);
-        config.rm_space();
-        assert_eq!(config.exists(PathType::Space), false);
-    }
+    // #[test]
+    // fn clone_repos() {
+    //     let config = Config::new();
+    //     let repos = config.clone_repos();
+    //     println!("{:?}", repos);
+    //     // assert_eq!(repos, config.repositories);
+    // }
 }
