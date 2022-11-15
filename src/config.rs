@@ -56,6 +56,7 @@ pub struct Paths {
     pub repositories: PathBuf,
 }
 
+#[allow(dead_code)]
 pub enum PathType {
     Space,
     Config,
@@ -98,8 +99,8 @@ impl Default for Config {
     }
 }
 
+//TODO: Move methods into Config impl; no need for trait
 pub trait ConfigFile {
-    fn new() -> Self;
     fn exists(&self, path: PathType) -> bool;
     fn read_config_raw(config_path: &PathBuf) -> Config;
     fn read_config(config_path: &PathBuf) -> Value;
@@ -108,15 +109,17 @@ pub trait ConfigFile {
     fn rm_space(&self);
 }
 
-impl ConfigFile for Config {
+impl Config {
     /// Create a new .gitspace file in the current working directory
-    fn new() -> Self {
+    pub fn new() -> Self {
         let config = Self::default();
         create_dir_all(&config.paths.repositories).unwrap();
         write(&config.paths.config, &config.to_str()).unwrap();
         config
     }
+}
 
+impl ConfigFile for Config {
     /// Checks if the .gitspace file exists
     fn exists(&self, path: PathType) -> bool {
         match path {
@@ -223,9 +226,7 @@ impl ConfigParser for Config {
             let path = format!("{}/{}/{}", ".gitspace", ".repos", repo.project);
             // println!("")
             Repository::clone(&url, path).unwrap();
-        });
-        // TODO: Implement FromIter on Config::Repo
-        // .collect::<Repo>();
+        }).collect::<Vec<_>>();
     }
 }
 
