@@ -1,15 +1,20 @@
+use git2::{Cred, FetchOptions, RemoteCallbacks, build};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::fs::{create_dir_all, remove_dir_all, remove_file, write, File};
+use std::io::BufReader;
+use std::path::{Path, PathBuf};
 
+const GITSPACE: &str = ".gitspace";
 /// Refers to your ~/.ssh/config file
 /// Struct parameters example:
 /// Host github
 ///    HostName github.com
 ///    User git
 ///    IdentityFile ~/.ssh/id_rsa
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct Ssh {
+struct Ssh {
     host: String,
     host_name: String,
     user: String,
@@ -20,38 +25,69 @@ pub struct Ssh {
 /// Struct parameters example:
 /// - github.com/capswan/cli-gitspace
 /// - github.com/{namespace}/{repository}
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-pub struct Repository {
+pub struct Repo {
     namespace: String,
     project: String,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Sync {
     enabled: bool,
     cron: String,
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Config {
+    paths: Paths,
     ssh: Ssh,
-    repositories: Vec<Repository>,
+    repositories: Vec<Repo>,
     sync: Sync,
+}
+
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct Paths {
+    pub space: PathBuf,
+    pub config: PathBuf,
+    pub repositories: PathBuf,
+}
+
+#[allow(dead_code)]
+pub enum PathType {
+    Space,
+    Config,
+    Repositories,
+}
+
+impl Default for Paths {
+    fn default() -> Self {
+        Paths {
+            space: PathBuf::from(".gitspace"),
+            config: PathBuf::from(".gitspace/config.json"),
+            repositories: PathBuf::from(".gitspace/repositories"),
+        }
+    }
 }
 
 impl Default for Config {
     fn default() -> Self {
         Config {
+            paths: Paths {
+                space: PathBuf::from(GITSPACE),
+                config: PathBuf::from(".gitspace/config.json"),
+                repositories: PathBuf::from(".gitspace/repositories"),
+            },
             ssh: Ssh {
                 host: "github".to_string(),
                 host_name: "github.com".to_string(),
                 user: "git".to_string(),
                 identity_file: "~/.ssh/id_rsa".to_string(),
             },
-            repositories: vec![Repository {
+            repositories: vec![Repo {
                 namespace: "capswan".to_string(),
                 project: "cli-gitspace".to_string(),
             }],
@@ -63,12 +99,76 @@ impl Default for Config {
     }
 }
 
+//TODO: Move methods into Config impl; no need for trait
+pub trait ConfigFile {
+    fn exists(&self, path: PathType) -> bool;
+    fn read_config_raw(config_path: &Path) -> Config;
+    fn read_config(config_path: &Path) -> Value;
+    fn rm_config(&self);
+    fn rm_repositories(&self);
+    fn rm_space(&self);
+}
+
+impl Config {
+    /// Create a new .gitspace file in the current working directory
+    pub fn new() -> Self {
+        let config = Self::default();
+        create_dir_all(&config.paths.repositories).unwrap();
+        write(&config.paths.config, &config.to_str()).unwrap();
+        config
+    }
+}
+
+impl ConfigFile for Config {
+    /// Checks if the .gitspace file exists
+    fn exists(&self, path: PathType) -> bool {
+        match path {
+            PathType::Space => Path::new(&self.paths.space).exists(),
+            PathType::Config => Path::new(&self.paths.config).exists(),
+            PathType::Repositories => Path::new(&self.paths.repositories).exists(),
+        }
+    }
+
+    /// Return a JSON value of the .gitspace file
+    fn read_config(config_path: &Path) -> Value {
+        let file = File::open(&config_path).unwrap();
+        let reader = BufReader::new(file);
+        let value: Value = serde_json::from_reader(reader).unwrap();
+        value
+    }
+
+    /// Return a Config struct of the .gitspace file
+    fn read_config_raw(config_path: &Path) -> Config {
+        let file = File::open(&config_path).unwrap();
+        let reader = BufReader::new(file);
+        let config: Config = serde_json::from_reader(reader).unwrap();
+        config
+    }
+    /// remove the .gitspace/config.json file
+    fn rm_config(&self) {
+        println!("Removing {}", &self.paths.config.display());
+        remove_file(&self.paths.config).unwrap();
+    }
+
+    /// remove the .gitspace/repositories directory
+    fn rm_repositories(&self) {
+        println!("Removing {}", &self.paths.repositories.display());
+        remove_dir_all(&self.paths.repositories).unwrap();
+    }
+
+    /// remove the .gitspace directory
+    fn rm_space(&self) {
+        println!("Removing {}", &self.paths.space.display());
+        remove_dir_all(&self.paths.space).unwrap();
+    }
+}
 pub trait ConfigTemplate {
-    // TODO: Consider replacing below with From & Into
+    //TODO: Consider replacing to_config & to_json with From & Into
+    //TODO: Consider replacing to_str with Display trait
     // https://doc.rust-lang.org/rust-by-example/conversion/from_into.html
     fn to_config(self) -> Config;
     fn to_json(self) -> Value;
-    fn to_str(self) -> String;
+    fn to_str(&self) -> String;
 }
 
 impl ConfigTemplate for Value {
@@ -78,7 +178,7 @@ impl ConfigTemplate for Value {
     fn to_json(self) -> Self {
         self
     }
-    fn to_str(self) -> String {
+    fn to_str(&self) -> String {
         serde_json::to_string_pretty(&self).unwrap()
     }
 }
@@ -90,7 +190,7 @@ impl ConfigTemplate for Config {
     fn to_json(self) -> Value {
         serde_json::to_value(self).unwrap()
     }
-    fn to_str(self) -> String {
+    fn to_str(&self) -> String {
         serde_json::to_string_pretty(&self).unwrap()
     }
 }
@@ -102,26 +202,122 @@ impl ConfigTemplate for String {
     fn to_json(self) -> Value {
         serde_json::from_str(self.as_str()).unwrap()
     }
-    fn to_str(self) -> Self {
-        self
+    fn to_str(&self) -> String {
+        String::from(self)
     }
 }
+
+pub trait ConfigParser {
+    fn clone_repos(&self, key_path: &Path);
+}
+
+impl ConfigParser for Config {
+    fn clone_repos(&self, key_path: &Path) {
+        //TODO: Iterate through every repository
+        //TODO: Clone each repository if it doesn't exist
+        //TODO: Pull each repository if it does exist
+        //TODO: Print a list of repositories and their status
+
+        // Instantiate buider for cloning, callbacks for processing credentials/auth request
+        let mut callbacks = RemoteCallbacks::new();
+        callbacks.credentials(|_url, username_from_url, _allowed_types| {
+            Cred::ssh_key(username_from_url.unwrap(), None, key_path, None)
+        });
+
+        let mut fetch_options = FetchOptions::new();
+        fetch_options.remote_callbacks(callbacks);
+
+
+        let mut builder = build::RepoBuilder::new();
+        builder.fetch_options(fetch_options);
+
+        self
+            .repositories
+            .iter()
+            .for_each(|repo| {
+                let repo_path = format!(
+                    "git@{}:{}/{}",
+                    &self.ssh.host_name, &repo.namespace, &repo.project
+                );
+                //TODO Allow users to put -s ~/.ssh/key_path at the end of the command
+                // --- https://stackoverflow.com/questions/55345730/how-can-i-prevent-the-last-argument-from-needing-to-be-quoted-with-clap
+                let _result = builder.clone(&repo_path, &self.paths.repositories).unwrap();
+            });
+    }
+}
+// self.clone().repositories.into_iter().map(|repo| {
+//     let url = format!(
+//         "git@{}:{}/{}.git",
+//         &self.ssh.host_name, repo.namespace, repo.project
+//     );
+//     let path = format!("{}/{}/{}", ".gitspace", ".repos", repo.project);
+//     // println!("")
+//     Repository::clone(&url, path).unwrap();
+// }).collect::<Vec<_>>();
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    #[test]
+    fn gitspace_is_generated() {
+        let template: Value = serde_json::json!({
+            "paths": {
+                "space": ".gitspace",
+                "config": ".gitspace/config.json",
+                "repositories": ".gitspace/repositories"
+            },
+            "ssh": {
+                "host": "github",
+                "hostName": "github.com",
+                "user": "git",
+                "identityFile": "~/.ssh/id_rsa"
+            },
+            "repositories": [
+                {
+                    "namespace": "capswan",
+                    "project": "cli-gitspace"
+                }
+            ],
+            "sync": {
+                "enabled": true,
+                "cron": "30 0 * * *"
+            }
+        });
+        // Convert template from JSON to a Config
+        let deserialized = serde_json::to_value(&template).unwrap();
+        let config = deserialized.to_config();
+        // exists checks the path stored on Config; ie. ".gitspace"
+        let config_exists = config.exists(PathType::Space);
+        assert!(config_exists);
+
+        // Comment this out to toggle the removal of the .gitspace directory
+        // config.rm_space();
+        // assert_eq!(config.exists(PathType::Space), false);
+    }
+
+    #[test]
+    fn can_read_config() {
+        let config = Config::new();
+        let config_file = Config::read_config(&config.paths.config);
+        assert_eq!(config_file, serde_json::to_value(&config).unwrap());
+    }
     /// Creating a raw Config, converting it to a JSON Value, and then comparing it to Default Config type
     #[test]
     fn config_to_json() {
         let config_raw = Config {
+            paths: Paths {
+                space: PathBuf::from(".gitspace"),
+                config: PathBuf::from(".gitspace/config.json"),
+                repositories: PathBuf::from(".gitspace/repositories"),
+            },
             ssh: Ssh {
                 host: "github".to_string(),
                 host_name: "github.com".to_string(),
                 user: "git".to_string(),
                 identity_file: "~/.ssh/id_rsa".to_string(),
             },
-            repositories: vec![Repository {
+            repositories: vec![Repo {
                 namespace: "capswan".to_string(),
                 project: "cli-gitspace".to_string(),
             }],
@@ -134,56 +330,12 @@ mod tests {
         let config_default_json = Config::default().to_json();
         assert_eq!(config_default_json, config_raw.to_json());
     }
-    #[test]
-    fn string_to_config() {
-        let config_str = r#"{ "ssh": { "host": "github", "hostName": "github.com", "user": "git", "identityFile": "~/.ssh/id_rsa" }, "repositories": [ { "namespace": "capswan", "project": "cli-gitspace" } ], "sync": { "enabled": true, "cron": "30 0 * * *" } }"#.to_owned();
-        let config_default = Config::default();
-        assert_eq!(config_default, config_str.to_config());
-    }
+
+    // #[test]
+    // fn clone_repos() {
+    //     let config = Config::new();
+    //     let repos = config.clone_repos();
+    //     println!("{:?}", repos);
+    //     // assert_eq!(repos, config.repositories);
+    // }
 }
-
-//     #[test]
-//     fn serialized_json_matches_deserialized_config() {
-//         let config = Config {
-//             ssh: Ssh {
-//                 host: "github".to_string(),
-//                 host_name: "github.com".to_string(),
-//                 user: "git".to_string(),
-//                 identity_file: "~/.ssh/id_rsa".to_string(),
-//             },
-//             repositories: vec![Repository {
-//                 namespace: "cli-gitspace".to_string(),
-//                 project: "cli".to_string(),
-//             }],
-//             sync: Sync {
-//                 enabled: true,
-//                 cron: "30 0 * * *".to_string(),
-//             },
-//         };
-
-//         // Create file with template serialized from the Config struct above
-//         // let serialized_config = serde_json::to_string(&config).unwrap();
-//         // let serialized_json = serde_json::to_string(&TEMPLATE).unwrap();
-
-//         // assert_eq!(serialized_config, serialized_json);
-//         unimplemented!()
-//     }
-// }
-// let mut TEMPLATE: serde_json::Value = json!({
-//     "ssh": {
-//         "host": "github",
-//         "hostName": "github.com",
-//         "user": "git",
-//         "identityFile": "~/.ssh/id_rsa"
-//     },
-//     "repositories": [
-//         {
-//             "namespace": "capswan",
-//             "project": "cli-gitspace"
-//         }
-//     ],
-//     "sync": {
-//         "enabled": true,
-//         "cron": "0 0 * * *"
-//     }
-// });
