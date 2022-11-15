@@ -35,7 +35,9 @@ fn main() {
             //TODO: Read config path from CLI flag if it exists, otherwise use Paths::default()
             let paths = Paths::default();
             let config = Config::read_config_raw(&paths.config);
-            config.clone_repos(&Path::new(&args.ssh_key.unwrap()));
+            match &args.ssh_key {
+                Some(_key) => config.clone_repos(Path::new(&args.ssh_key.unwrap())),
+                None => config.clone_repos(Path::new(&config.ssh.identity_file)),            }
         }
     }
 }

@@ -1,4 +1,4 @@
-use git2::{Cred, FetchOptions, RemoteCallbacks, build};
+use git2::{build, Cred, FetchOptions, RemoteCallbacks, Repository};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs::{create_dir_all, remove_dir_all, remove_file, write, File};
@@ -14,11 +14,11 @@ const GITSPACE: &str = ".gitspace";
 ///    IdentityFile ~/.ssh/id_rsa
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
-struct Ssh {
+pub struct Ssh {
     host: String,
     host_name: String,
     user: String,
-    identity_file: String,
+    pub identity_file: String,
 }
 
 /// Single repository within an array of repositories inside the .gitspace file
@@ -43,7 +43,7 @@ pub struct Sync {
 #[serde(rename_all = "camelCase")]
 pub struct Config {
     paths: Paths,
-    ssh: Ssh,
+    pub ssh: Ssh,
     repositories: Vec<Repo>,
     sync: Sync,
 }
@@ -87,10 +87,16 @@ impl Default for Config {
                 user: "git".to_string(),
                 identity_file: "~/.ssh/id_rsa".to_string(),
             },
-            repositories: vec![Repo {
-                namespace: "capswan".to_string(),
-                project: "cli-gitspace".to_string(),
-            }],
+            repositories: vec![
+                Repo {
+                    namespace: "capswan".to_string(),
+                    project: "cli-gitspace".to_string(),
+                },
+                Repo {
+                    namespace: "capswan".to_string(),
+                    project: "cli-ftr".to_string(),
+                },
+            ],
             sync: Sync {
                 enabled: true,
                 cron: "30 0 * * *".to_string(),
@@ -218,31 +224,47 @@ impl ConfigParser for Config {
         //TODO: Pull each repository if it does exist
         //TODO: Print a list of repositories and their status
 
-        // Instantiate buider for cloning, callbacks for processing credentials/auth request
-        let mut callbacks = RemoteCallbacks::new();
-        callbacks.credentials(|_url, username_from_url, _allowed_types| {
-            Cred::ssh_key(username_from_url.unwrap(), None, key_path, None)
-        });
-
-        let mut fetch_options = FetchOptions::new();
-        fetch_options.remote_callbacks(callbacks);
-
-
-        let mut builder = build::RepoBuilder::new();
-        builder.fetch_options(fetch_options);
-
-        self
-            .repositories
-            .iter()
-            .for_each(|repo| {
-                let repo_path = format!(
-                    "git@{}:{}/{}",
-                    &self.ssh.host_name, &repo.namespace, &repo.project
-                );
-                //TODO Allow users to put -s ~/.ssh/key_path at the end of the command
-                // --- https://stackoverflow.com/questions/55345730/how-can-i-prevent-the-last-argument-from-needing-to-be-quoted-with-clap
-                let _result = builder.clone(&repo_path, &self.paths.repositories).unwrap();
+        self.repositories.iter().for_each(|repo| {
+            // Instantiate buider for cloning, callbacks for processing credentials/auth request
+            let mut callbacks = RemoteCallbacks::new();
+            callbacks.credentials(|_url, username_from_url, _allowed_types| {
+                Cred::ssh_key(username_from_url.unwrap(), None, &key_path, None)
             });
+            let mut fetch_options = FetchOptions::new();
+            &fetch_options.remote_callbacks(callbacks);
+
+            let repo_path = format!(
+                "git@{}:{}/{}",
+                &self.ssh.host_name, &repo.namespace, &repo.project
+            );
+
+            if !Path::new(&repo.project).exists() {
+                //TODO: Allow users to put -s ~/.ssh/key_path at the end of the command
+                //TODO: move occurs because fetch_options has type `git2::FetchOptions`, which does not implement the `Copy` trait
+
+                println!("Cloning {}", &repo_path);
+                create_dir_all(&repo.project).unwrap();
+                let mut builder = build::RepoBuilder::new();
+                builder.fetch_options(fetch_options);
+                //TODO: Append the project to the path; replace self.paths.repositories with
+                //PathBuf
+                let mut repo_directory = PathBuf::new();
+                repo_directory.push(&self.paths.repositories);
+                repo_directory.push(&repo.project);
+
+                // let repo_directory: PathBuf = [&self.paths.repositories, &repo.project].iter().collect();
+                builder.clone(&repo_path, &repo_directory).unwrap();
+            }
+            // else {
+            //     println!("Pulling {}", &repo_path);
+            //     let repo = Repository::open(&repo_path).unwrap();
+            //     let mut remote = repo.find_remote("origin").unwrap();
+            //     //TODO: Handle multiple branch names, not just master
+            //     remote
+            //         .fetch(&["master"], Some(&mut fetch_options), None)
+            //         .unwrap();
+            // }
+        });
     }
 }
 // self.clone().repositories.into_iter().map(|repo| {
