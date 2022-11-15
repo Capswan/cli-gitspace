@@ -102,7 +102,7 @@ impl Default for Config {
 //TODO: Move methods into Config impl; no need for trait
 pub trait ConfigFile {
     fn exists(&self, path: PathType) -> bool;
-    fn read_config_raw(config_path: &PathBuf) -> Config;
+    fn read_config_raw(config_path: &Path) -> Config;
     fn read_config(config_path: &PathBuf) -> Value;
     fn rm_config(&self);
     fn rm_repositories(&self);
@@ -138,7 +138,7 @@ impl ConfigFile for Config {
     }
 
     /// Return a Config struct of the .gitspace file
-    fn read_config_raw(config_path: &PathBuf) -> Config {
+    fn read_config_raw(config_path: &Path) -> Config {
         let file = File::open(&config_path).unwrap();
         let reader = BufReader::new(file);
         let config: Config = serde_json::from_reader(reader).unwrap();
