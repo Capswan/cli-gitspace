@@ -3,12 +3,16 @@
 use clap::{Parser, Subcommand};
 mod config;
 use config::{Config, ConfigFile, ConfigParser, Paths};
+use std::path::Path;
 
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
 struct Arguments {
     #[clap(short, long)]
     config_file: Option<String>,
+
+    #[clap(short, long)]
+    ssh_key: Option<String>,
 
     #[clap(subcommand)]
     cmd: SubCommand,
@@ -31,7 +35,7 @@ fn main() {
             //TODO: Read config path from CLI flag if it exists, otherwise use Paths::default()
             let paths = Paths::default();
             let config = Config::read_config_raw(&paths.config);
-            config.clone_repos();
+            config.clone_repos(&Path::new(&args.ssh_key.unwrap()));
         }
     }
 }

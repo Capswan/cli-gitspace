@@ -1,4 +1,4 @@
-use git2::Repository;
+use git2::{Cred, FetchOptions, RemoteCallbacks, build};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs::{create_dir_all, remove_dir_all, remove_file, write, File};
@@ -103,7 +103,7 @@ impl Default for Config {
 pub trait ConfigFile {
     fn exists(&self, path: PathType) -> bool;
     fn read_config_raw(config_path: &Path) -> Config;
-    fn read_config(config_path: &PathBuf) -> Value;
+    fn read_config(config_path: &Path) -> Value;
     fn rm_config(&self);
     fn rm_repositories(&self);
     fn rm_space(&self);
@@ -130,7 +130,7 @@ impl ConfigFile for Config {
     }
 
     /// Return a JSON value of the .gitspace file
-    fn read_config(config_path: &PathBuf) -> Value {
+    fn read_config(config_path: &Path) -> Value {
         let file = File::open(&config_path).unwrap();
         let reader = BufReader::new(file);
         let value: Value = serde_json::from_reader(reader).unwrap();
@@ -208,27 +208,52 @@ impl ConfigTemplate for String {
 }
 
 pub trait ConfigParser {
-    fn clone_repos(&self);
+    fn clone_repos(&self, key_path: &Path);
 }
 
 impl ConfigParser for Config {
-    fn clone_repos(&self) {
+    fn clone_repos(&self, key_path: &Path) {
         //TODO: Iterate through every repository
         //TODO: Clone each repository if it doesn't exist
         //TODO: Pull each repository if it does exist
         //TODO: Print a list of repositories and their status
 
-        self.clone().repositories.into_iter().map(|repo| {
-            let url = format!(
-                "git@{}:{}/{}.git",
-                &self.ssh.host_name, repo.namespace, repo.project
-            );
-            let path = format!("{}/{}/{}", ".gitspace", ".repos", repo.project);
-            // println!("")
-            Repository::clone(&url, path).unwrap();
-        }).collect::<Vec<_>>();
+        // Instantiate buider for cloning, callbacks for processing credentials/auth request
+        let mut callbacks = RemoteCallbacks::new();
+        callbacks.credentials(|_url, username_from_url, _allowed_types| {
+            Cred::ssh_key(username_from_url.unwrap(), None, key_path, None)
+        });
+
+        let mut fetch_options = FetchOptions::new();
+        fetch_options.remote_callbacks(callbacks);
+
+
+        let mut builder = build::RepoBuilder::new();
+        builder.fetch_options(fetch_options);
+
+        self
+            .repositories
+            .iter()
+            .for_each(|repo| {
+                let repo_path = format!(
+                    "git@{}:{}/{}",
+                    &self.ssh.host_name, &repo.namespace, &repo.project
+                );
+                //TODO Allow users to put -s ~/.ssh/key_path at the end of the command
+                // --- https://stackoverflow.com/questions/55345730/how-can-i-prevent-the-last-argument-from-needing-to-be-quoted-with-clap
+                let _result = builder.clone(&repo_path, &self.paths.repositories).unwrap();
+            });
     }
 }
+// self.clone().repositories.into_iter().map(|repo| {
+//     let url = format!(
+//         "git@{}:{}/{}.git",
+//         &self.ssh.host_name, repo.namespace, repo.project
+//     );
+//     let path = format!("{}/{}/{}", ".gitspace", ".repos", repo.project);
+//     // println!("")
+//     Repository::clone(&url, path).unwrap();
+// }).collect::<Vec<_>>();
 
 #[cfg(test)]
 mod tests {
