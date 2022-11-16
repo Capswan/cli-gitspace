@@ -1,0 +1,27 @@
+{
+  "paths": {
+    "space": ".space",
+    "config": "config.json",
+    "repositories": "repositories"
+  },
+  "ssh": {
+    "host": "github",
+    "hostName": "github.com",
+    "user": "git",
+    "identityFile": "Some(\"/Users/alechp\")/.ssh/id_rsa"
+  },
+  "repositories": [
+    {
+      "namespace": "capswan",
+      "project": "cli-gitspace"
+    },
+    {
+      "namespace": "capswan",
+      "project": "cli-ftr"
+    }
+  ],
+  "sync": {
+    "enabled": true,
+    "cron": "30 0 * * *"
+  }
+}
