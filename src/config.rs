@@ -122,10 +122,15 @@ impl Config {
     /// Create a new .gitspace file in the current working directory
     pub fn new() -> Self {
         let config = Self::default();
-        let (_, config_path, repositories_path) = &config.get_paths_as_strings();
+        let repositories_path = &config.get_path_as_string(PathType::Repositories);
         create_dir_all(&repositories_path).unwrap();
-        write(&config_path, &config.to_str()).unwrap();
         config
+    }
+
+    pub fn write_config(&self) {
+        let config_path = &self.get_path_as_string(PathType::Config);
+        println!("{:?}", config_path);
+        write(&config_path, &self.to_str()).unwrap();
     }
 
     pub fn get_path_as_string(&self, path_type: PathType) -> String {
@@ -168,6 +173,7 @@ impl ConfigFile for Config {
 
     /// Return a JSON value of the .gitspace file
     fn read_config_json(config_path: &Path) -> Value {
+        println!("{:?}", config_path);
         let file = File::open(&config_path).unwrap();
         let reader = BufReader::new(file);
         let value: Value = serde_json::from_reader(reader).unwrap();
@@ -176,6 +182,7 @@ impl ConfigFile for Config {
 
     /// Return a Config struct of the .gitspace file
     fn read_config_raw(config_path: &Path) -> Config {
+        println!("{:?}", config_path);
         let file = File::open(&config_path).unwrap();
         let reader = BufReader::new(file);
         let config: Config = serde_json::from_reader(reader).unwrap();
@@ -271,8 +278,7 @@ impl ConfigParser for Config {
                 //TODO: Allow users to put -s ~/.ssh/key_path at the end of the command
 
                 let mut repo_dir = PathBuf::new();
-                repo_dir.push(".");
-                repo_dir.push(&self.paths.repositories);
+                repo_dir.push(&self.get_path_as_string(PathType::Repositories));
                 repo_dir.push(&repo.project);
 
                 create_dir_all(&repo_dir).unwrap();
@@ -285,19 +291,17 @@ impl ConfigParser for Config {
 
                 let mut builder = build::RepoBuilder::new();
                 builder.fetch_options(fetch_options);
-                //TODO: Append the project to the path; replace self.paths.repositories with
-                //PathBuf
-
                 builder.clone(&repo_uri, &repo_dir).unwrap();
-            } else {
-                println!("Pulling {}", &repo_uri);
-                let repo = Repository::open(&repo_uri).unwrap();
-                let mut remote = repo.find_remote("origin").unwrap();
-                //TODO: Handle multiple branch names, not just master
-                remote
-                    .fetch(&["master"], Some(&mut fetch_options), None)
-                    .unwrap();
-            }
+            } 
+            // else {
+            //     println!("Pulling {}", &repo_uri);
+            //     let repo = Repository::open(&repo_uri).unwrap();
+            //     let mut remote = repo.find_remote("origin").unwrap();
+            //     //TODO: Handle multiple branch names, not just master
+            //     remote
+            //         .fetch(&["master"], Some(&mut fetch_options), None)
+            //         .unwrap();
+            // }
         });
     }
 }
@@ -317,7 +321,11 @@ mod tests {
 
     #[test]
     fn gitspace_is_generated() {
+        if(Path::new(".gitspace").exists()) {
+            remove_dir_all(".gitspace").unwrap();
+        }
         let config = Config::new();
+        &config.write_config();
         // exists checks the path stored on Config; ie. ".gitspace"
         let config_exists = config.exists(PathType::Config);
         assert!(config_exists);
