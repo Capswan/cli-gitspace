@@ -78,10 +78,7 @@ impl Default for Paths {
 }
 
 pub fn get_key_path() -> String {
-    let key_path: PathBuf = home_dir()
-        .unwrap()
-        .join(".ssh")
-        .join("id_rsa");
+    let key_path: PathBuf = home_dir().unwrap().join(".ssh").join("id_rsa");
     key_path.to_str().unwrap().to_string()
     // String::from(key_path)
 }
@@ -202,17 +199,23 @@ impl Config {
 
     /// remove the .gitspace/config.json file
     pub fn rm_config(&self) {
-        remove_file(&self.paths.config).unwrap();
+        let config_path = &self.get_path_as_string(PathType::Config);
+        remove_file(&config_path).unwrap();
+        println!("🧱 Removed config.json");
     }
 
     /// remove the .gitspace/repositories directory
     pub fn rm_repositories(&self) {
-        remove_dir_all(&self.paths.repositories).unwrap();
+        let repositories_path = &self.get_path_as_string(PathType::Repositories);
+        remove_dir_all(&repositories_path).unwrap();
+        println!("🧱 Removed repositories directory");
     }
 
     /// remove the .gitspace directory
     pub fn rm_space(&self) {
-        remove_dir_all(&self.paths.space).unwrap();
+        let space_path = &self.get_path_as_string(PathType::Space);
+        remove_dir_all(&space_path).unwrap();
+        println!("🧱 Removed .space directory");
     }
 
     /// Clone all repositories from config.json
@@ -253,8 +256,7 @@ impl Config {
                 let mut builder = build::RepoBuilder::new();
                 builder.fetch_options(fetch_options);
                 builder.clone(&repo_uri, &repo_dir).unwrap();
-            }
-            else {
+            } else {
                 println!("Pulling {}", &repo_uri);
                 let repo = Repository::open(&repo_uri).unwrap();
                 let mut remote = repo.find_remote("origin").unwrap();
@@ -339,7 +341,7 @@ mod tests {
     fn config_to_json() {
         // WARN: This could fail on other systems (eg. Windows) since default will change the home dir
         // If this test fails, can simply ignore
-        let key_path = get_key_path(); 
+        let key_path = get_key_path();
         let config_raw = Config {
             paths: Paths {
                 space: String::from(GITSPACE),
@@ -396,9 +398,6 @@ mod tests {
     fn get_ssh_key_path() {
         let config = Config::default();
         let ssh_key_path = &config.get_path_as_string(PathType::Key);
-        assert_eq!(
-            ssh_key_path.as_str(),
-            get_key_path()
-        );
+        assert_eq!(ssh_key_path.as_str(), get_key_path());
     }
 }
