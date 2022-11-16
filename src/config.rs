@@ -6,7 +6,7 @@ use std::io::BufReader;
 use std::path::{Path, PathBuf};
 
 // Feature dependencies
-use git2::{build, Cred, FetchOptions, RemoteCallbacks};
+use git2::{build, Cred, FetchOptions, RemoteCallbacks, Repository};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -201,19 +201,19 @@ impl Config {
     }
 
     /// remove the .gitspace/config.json file
-    // fn rm_config(&self) {
-    //     remove_file(&self.paths.config).unwrap();
-    // }
+    pub fn rm_config(&self) {
+        remove_file(&self.paths.config).unwrap();
+    }
 
     /// remove the .gitspace/repositories directory
-    // fn rm_repositories(&self) {
-    //     remove_dir_all(&self.paths.repositories).unwrap();
-    // }
+    pub fn rm_repositories(&self) {
+        remove_dir_all(&self.paths.repositories).unwrap();
+    }
 
     /// remove the .gitspace directory
-    // fn rm_space(&self) {
-    //     remove_dir_all(&self.paths.space).unwrap();
-    // }
+    pub fn rm_space(&self) {
+        remove_dir_all(&self.paths.space).unwrap();
+    }
 
     /// Clone all repositories from config.json
     pub fn clone_repos(&self, key_path: &Path) {
@@ -254,15 +254,15 @@ impl Config {
                 builder.fetch_options(fetch_options);
                 builder.clone(&repo_uri, &repo_dir).unwrap();
             }
-            // else {
-            //     println!("Pulling {}", &repo_uri);
-            //     let repo = Repository::open(&repo_uri).unwrap();
-            //     let mut remote = repo.find_remote("origin").unwrap();
-            //     //TODO: Handle multiple branch names, not just master
-            //     remote
-            //         .fetch(&["master"], Some(&mut fetch_options), None)
-            //         .unwrap();
-            // }
+            else {
+                println!("Pulling {}", &repo_uri);
+                let repo = Repository::open(&repo_uri).unwrap();
+                let mut remote = repo.find_remote("origin").unwrap();
+                //TODO: Handle multiple branch names, not just master
+                remote
+                    .fetch(&["master"], Some(&mut fetch_options), None)
+                    .unwrap();
+            }
         });
     }
 }
