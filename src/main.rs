@@ -24,24 +24,6 @@ struct Arguments {
     cmd: SubCommand,
 }
 
-// Similar to PathType, but not keeping separate to ensure Key isn't used (don't want to enable users to remove their own SSH key for obvious reasons)
-// #[derive(Debug, Clone)]
-// enum CleanType {
-//     Space,
-//     Config,
-//     Repositories,
-// }
-
-// impl Display for CleanType {
-//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-//         match self {
-//             CleanType::Space => write!(f, "space"),
-//             CleanType::Config => write!(f, "config"),
-//             CleanType::Repositories => write!(f, "repositories"),
-//         }
-//     }
-// }
-
 #[derive(Subcommand, Debug)]
 enum SubCommand {
     /// Generate a .space directory with default config.json
@@ -95,22 +77,7 @@ fn main() {
             }
             _ => {
                 let _ = &config.rm_repositories();
-            } // CleanType::Space => {
-              //     println!("🧱 Removing .space directory");
-              //     let _ = &config.rm_space();
-              // }
-              // CleanType::Config => {
-              //     println!("🧱 Removing config.json");
-              //     let _ = &config.rm_config();
-              // }
-              // CleanType::Repositories => {
-              //     println!("🧱 Removing repositories directory");
-              //     let _ = &config.rm_repositories();
-              // }
-              // _ => {
-              //     println!("🧱 Cleaning repositories");
-              //     let _ = &config.rm_repositories();
-              // }
+            }
         },
     }
 }
