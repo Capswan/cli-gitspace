@@ -29,7 +29,10 @@ enum SubCommand {
     /// Generate a .space directory with default config.json
     Init {},
     /// Clone/update repositories specified in config.json
-    Sync {},
+    Sync {
+        // /TODO: Allow users to put -s ~/.ssh/key_path at the end of the command by
+        //migrating from CLI arg to Subcommand::Sync arg
+    },
     /// Cleanup target path;
     Clean {
         #[clap(short, long)]

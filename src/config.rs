@@ -179,6 +179,28 @@ impl Config {
         }
     }
 
+    fn dir_is_empty(&self, path_type: PathType, repo_dir: &str) -> bool {
+        //TODO: Cleanup function; needlessly verbose
+        match path_type {
+            PathType::Space => PathBuf::from(&self.get_path_as_string(path_type))
+                .join(&repo_dir)
+                .read_dir()
+                .unwrap()
+                .next()
+                .is_none(),
+            PathType::Repositories => PathBuf::from(&self.get_path_as_string(path_type))
+                .join(&repo_dir)
+                .read_dir()
+                .unwrap()
+                .next()
+                .is_none(),
+            _ => {
+                println!("Not a valid path type");
+                false
+            }
+        }
+    }
+
     /// Return a JSON value of the config.json file
     // fn read_config_json(config_path: &Path) -> Value {
     //     // println!("{:?}", config_path);
@@ -235,35 +257,38 @@ impl Config {
                 &self.ssh.host_name, &repo.namespace, &repo.project
             );
 
-            //TODO: Get Path from PathType instead of hardcoding
-            //TODO: Update get_path to include Project
-            //TODO: Update get_paths to include Project
-            if !Path::new(&repo.project).exists() {
-                //TODO: Allow users to put -s ~/.ssh/key_path at the end of the command
+            if Path::new(&self.get_path_as_string(PathType::Repositories)).exists() {
+                if self.dir_is_empty(PathType::Repositories, &repo.project) {
+                    let mut repo_dir = PathBuf::new();
+                    repo_dir.push(&self.get_path_as_string(PathType::Repositories));
+                    repo_dir.push(&repo.project);
 
-                let mut repo_dir = PathBuf::new();
-                repo_dir.push(&self.get_path_as_string(PathType::Repositories));
-                repo_dir.push(&repo.project);
+                    println!("🧱 Cloning {} into {}", &repo.project, &repo_dir.display());
+                    let _ = Repository::clone(&repo_uri, &repo_dir).unwrap();
 
-                create_dir_all(&repo_dir).unwrap();
+                    create_dir_all(&repo_dir).unwrap();
 
-                println!(
-                    "🚀 Cloning {} into {}",
-                    &repo_uri,
-                    &repo_dir.display().to_string()
-                );
-
-                let mut builder = build::RepoBuilder::new();
-                builder.fetch_options(fetch_options);
-                builder.clone(&repo_uri, &repo_dir).unwrap();
+                    println!(
+                        "🚀 Cloning {} into {}",
+                        &repo_uri,
+                        &repo_dir.display().to_string()
+                    );
+                    let mut builder = build::RepoBuilder::new();
+                    builder.fetch_options(fetch_options);
+                    builder.clone(&repo_uri, &repo_dir).unwrap();
+                } 
+                // else {
+                //     println!("🧱 {} already exists", &repo.project);
+                //     println!("Pulling {}", &repo_uri);
+                //     let repo = Repository::open(&repo_uri).unwrap();
+                //     let mut remote = repo.find_remote("origin").unwrap();
+                //     //TODO: Handle multiple branch names, not just master
+                //     remote
+                //         .fetch(&["master"], Some(&mut fetch_options), None)
+                //         .unwrap();
+                // }
             } else {
-                println!("Pulling {}", &repo_uri);
-                let repo = Repository::open(&repo_uri).unwrap();
-                let mut remote = repo.find_remote("origin").unwrap();
-                //TODO: Handle multiple branch names, not just master
-                remote
-                    .fetch(&["master"], Some(&mut fetch_options), None)
-                    .unwrap();
+                println!("🧱 repositories directory does not exist. Please init first");
             }
         });
     }
