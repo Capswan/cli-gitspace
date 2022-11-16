@@ -8,7 +8,7 @@ use std::path::Path;
 // CLI dependencies
 use clap::{Parser, Subcommand};
 mod config;
-use config::{Config, PathType};
+use config::{Config, PathType, get_key_path};
 
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
@@ -44,17 +44,18 @@ fn main() {
                 .config_file
                 .unwrap_or_else(|| config.get_path_as_string(PathType::Config));
 
+            let config = Config::read_config_raw(Path::new(&config_path));
+            println!("{:#?}", &config);
+
             println!("🧱 Config path: {:?}", &config_path);
             let key_path = &args.ssh_key.unwrap_or_else(|| {
-                Config::read_config_raw(Path::new(&config_path)).get_path_as_string(PathType::Key)
+                String::from(&config.ssh.identity_file)
             });
-            println!("🧱 Key path: {:?}", Path::new(key_path));
+            println!("🧱 Key path: {:?}", key_path);
             // let mut file = File::open(Path::new(key_path)).expect("File not found");
             // let mut data = String::new();
             // file.read_to_string(&mut data).expect("Error reading file");
             // println!("🧱 Key content: {:?}", data);
-            let config = Config::read_config_raw(Path::new(&config_path));
-            println!("{:#?}", &config);
             config.clone_repos(Path::new(&key_path));
         }
     }

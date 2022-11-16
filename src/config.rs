@@ -77,8 +77,17 @@ impl Default for Paths {
     }
 }
 
+pub fn get_key_path() -> String {
+    let key_path: PathBuf = home_dir()
+        .unwrap()
+        .join(".ssh")
+        .join("id_rsa");
+    key_path.to_str().unwrap().to_string()
+    // String::from(key_path)
+}
 impl Default for Config {
     fn default() -> Self {
+        let key_path = get_key_path();
         Config {
             paths: Paths {
                 space: GITSPACE.to_string(),
@@ -89,7 +98,7 @@ impl Default for Config {
                 host: "github".to_string(),
                 host_name: "github.com".to_string(),
                 user: "git".to_string(),
-                identity_file: format!("{:?}/{}", home_dir(), ".ssh/id_rsa"),
+                identity_file: key_path,
             },
             repositories: vec![
                 Repo {
@@ -134,7 +143,10 @@ impl Config {
         // println!("{:?}", config_path);
         let repositories_path = format!("{}/{}", &self.paths.space, &self.paths.repositories);
         // println!("{:?}", repositories_path);
-        let key_path = String::from(&self.ssh.identity_file);
+
+        let key_path = get_key_path();
+        // let home_path = home_dir().unwrap()
+        // let key_path = String::from(&self.ssh.identity_file);
         // println!("{:?}", key_path);
         let requested_path = match path_type {
             PathType::Space => space_path,
@@ -171,13 +183,13 @@ impl Config {
     }
 
     /// Return a JSON value of the config.json file
-    fn read_config_json(config_path: &Path) -> Value {
-        // println!("{:?}", config_path);
-        let file = File::open(&config_path).unwrap();
-        let reader = BufReader::new(file);
-        let value: Value = serde_json::from_reader(reader).unwrap();
-        value
-    }
+    // fn read_config_json(config_path: &Path) -> Value {
+    //     // println!("{:?}", config_path);
+    //     let file = File::open(&config_path).unwrap();
+    //     let reader = BufReader::new(file);
+    //     let value: Value = serde_json::from_reader(reader).unwrap();
+    //     value
+    // }
 
     /// Return a Config struct of the .gitspace file
     pub fn read_config_raw(config_path: &Path) -> Config {
@@ -189,19 +201,19 @@ impl Config {
     }
 
     /// remove the .gitspace/config.json file
-    fn rm_config(&self) {
-        remove_file(&self.paths.config).unwrap();
-    }
+    // fn rm_config(&self) {
+    //     remove_file(&self.paths.config).unwrap();
+    // }
 
     /// remove the .gitspace/repositories directory
-    fn rm_repositories(&self) {
-        remove_dir_all(&self.paths.repositories).unwrap();
-    }
+    // fn rm_repositories(&self) {
+    //     remove_dir_all(&self.paths.repositories).unwrap();
+    // }
 
     /// remove the .gitspace directory
-    fn rm_space(&self) {
-        remove_dir_all(&self.paths.space).unwrap();
-    }
+    // fn rm_space(&self) {
+    //     remove_dir_all(&self.paths.space).unwrap();
+    // }
 
     /// Clone all repositories from config.json
     pub fn clone_repos(&self, key_path: &Path) {
@@ -325,6 +337,9 @@ mod tests {
     /// Creating a raw Config, converting it to a JSON Value, and then comparing it to Default Config type
     #[test]
     fn config_to_json() {
+        // WARN: This could fail on other systems (eg. Windows) since default will change the home dir
+        // If this test fails, can simply ignore
+        let key_path = get_key_path(); 
         let config_raw = Config {
             paths: Paths {
                 space: String::from(GITSPACE),
@@ -335,7 +350,7 @@ mod tests {
                 host: "github".to_string(),
                 host_name: "github.com".to_string(),
                 user: "git".to_string(),
-                identity_file: format!("{:?}/{}", home_dir(), ".ssh/id_rsa"),
+                identity_file: key_path,
             },
             repositories: vec![
                 Repo {
@@ -383,7 +398,7 @@ mod tests {
         let ssh_key_path = &config.get_path_as_string(PathType::Key);
         assert_eq!(
             ssh_key_path.as_str(),
-            format!("{:?}/{}", home_dir(), ".ssh/id_rsa")
+            get_key_path()
         );
     }
 }

@@ -8,7 +8,7 @@
     "host": "github",
     "hostName": "github.com",
     "user": "git",
-    "identityFile": "Some(\"/Users/alechp\")/.ssh/id_rsa"
+    "identityFile": "/Users/alechp/.ssh/alechp"
   },
   "repositories": [
     {
