@@ -13,6 +13,7 @@ use serde_json::Value;
 const GITSPACE: &str = ".space";
 const CONFIG: &str = "config.json";
 const REPOS: &str = "repositories";
+
 /// Refers to your ~/.ssh/config file
 /// Struct parameters example:
 /// Host github
@@ -77,14 +78,14 @@ impl Default for Paths {
     }
 }
 
-pub fn get_key_path() -> String {
-    let key_path: PathBuf = home_dir().unwrap().join(".ssh").join("id_rsa");
-    key_path.to_str().unwrap().to_string()
-    // String::from(key_path)
-}
 impl Default for Config {
     fn default() -> Self {
-        let key_path = get_key_path();
+        let key_path = home_dir()
+            .unwrap()
+            .join(".ssh/id_rsa")
+            .to_str()
+            .unwrap()
+            .to_string();
         Config {
             paths: Paths {
                 space: GITSPACE.to_string(),
@@ -120,20 +121,20 @@ impl Config {
     /// Create a new .space directory with empty repositories directory
     pub fn new() -> Self {
         let config = Self::default();
-        let repositories_path = &config.get_path_as_string(PathType::Repositories);
+        let repositories_path = &config.get_path_as_string(&PathType::Repositories);
         create_dir_all(&repositories_path).unwrap();
         config
     }
 
     /// Write config.json inside .space directory
     pub fn write_config(&self) {
-        let config_path = &self.get_path_as_string(PathType::Config);
+        let config_path = &self.get_path_as_string(&PathType::Config);
         // println!("{:?}", config_path);
         write(&config_path, &self.to_str()).unwrap();
     }
 
     /// Get common paths
-    pub fn get_path_as_string(&self, path_type: PathType) -> String {
+    pub fn get_path_as_string(&self, path_type: &PathType) -> String {
         let space_path = String::from(&self.paths.space);
         // println!("{:?}", space_path);
         let config_path = format!("{}/{}", &self.paths.space, &self.paths.config);
@@ -141,25 +142,36 @@ impl Config {
         let repositories_path = format!("{}/{}", &self.paths.space, &self.paths.repositories);
         // println!("{:?}", repositories_path);
 
-        let key_path = get_key_path();
-        // let home_path = home_dir().unwrap()
-        // let key_path = String::from(&self.ssh.identity_file);
+        // let key_name = Config::read_config_raw(Path::new(&config_path))
+        //     .ssh
+        //     .identity_file
+        //     .to_string();
+
+        // let key_path: PathBuf = PathBuf::new();
+        // key_path
+        //     .join(home_dir().unwrap())
+        //     .join(".ssh")
+        //     .join(key_name)
+        //     .to_str()
+        //     .unwrap();
+        let key_path = &self.ssh.identity_file;
+
         // println!("{:?}", key_path);
         let requested_path = match path_type {
             PathType::Space => space_path,
             PathType::Config => config_path,
             PathType::Repositories => repositories_path,
-            PathType::Key => key_path,
+            PathType::Key => key_path.to_owned(),
         };
         requested_path
     }
 
     /// Get a tuple of all common paths (space, config, repositories, key)
     pub fn get_paths_as_strings(&self) -> (String, String, String, String) {
-        let space_path = &self.get_path_as_string(PathType::Space);
-        let config_path = &self.get_path_as_string(PathType::Config);
-        let repositories_path = &self.get_path_as_string(PathType::Repositories);
-        let ssh_key_path = &self.get_path_as_string(PathType::Key);
+        let space_path = &self.get_path_as_string(&PathType::Space);
+        let config_path = &self.get_path_as_string(&PathType::Config);
+        let repositories_path = &self.get_path_as_string(&PathType::Repositories);
+        let ssh_key_path = &self.get_path_as_string(&PathType::Key);
         (
             space_path.to_string(),
             config_path.to_string(),
@@ -168,37 +180,24 @@ impl Config {
         )
     }
 
-    // Not needed currently since exists method is available on Path
-    fn exists(&self, path: PathType) -> bool {
+    fn exists(&self, path: &PathType) -> bool {
         let (space, config, repos, key) = &self.get_paths_as_strings();
         match path {
-            PathType::Space => Path::new(space).exists(),
-            PathType::Config => Path::new(config).exists(),
-            PathType::Repositories => Path::new(repos).exists(),
-            PathType::Key => Path::new(key).exists(),
+            &PathType::Space => Path::new(space).exists(),
+            &PathType::Config => Path::new(config).exists(),
+            &PathType::Repositories => Path::new(repos).exists(),
+            &PathType::Key => Path::new(key).exists(),
         }
     }
 
     fn dir_is_empty(&self, path_type: PathType, repo_dir: &str) -> bool {
-        //TODO: Cleanup function; needlessly verbose
-        match path_type {
-            PathType::Space => PathBuf::from(&self.get_path_as_string(path_type))
-                .join(&repo_dir)
-                .read_dir()
-                .unwrap()
-                .next()
-                .is_none(),
-            PathType::Repositories => PathBuf::from(&self.get_path_as_string(path_type))
-                .join(&repo_dir)
-                .read_dir()
-                .unwrap()
-                .next()
-                .is_none(),
-            _ => {
-                println!("Not a valid path type");
-                false
-            }
-        }
+        let dir = PathBuf::from(&self.get_path_as_string(&path_type))
+            .join(&repo_dir)
+            .read_dir()
+            .unwrap()
+            .next()
+            .is_none();
+        dir
     }
 
     /// Return a JSON value of the config.json file
@@ -221,21 +220,21 @@ impl Config {
 
     /// remove the .gitspace/config.json file
     pub fn rm_config(&self) {
-        let config_path = &self.get_path_as_string(PathType::Config);
+        let config_path = &self.get_path_as_string(&PathType::Config);
         remove_file(&config_path).unwrap();
         println!("🧱 Removed config.json");
     }
 
     /// remove the .gitspace/repositories directory
     pub fn rm_repositories(&self) {
-        let repositories_path = &self.get_path_as_string(PathType::Repositories);
+        let repositories_path = &self.get_path_as_string(&PathType::Repositories);
         remove_dir_all(&repositories_path).unwrap();
         println!("🧱 Removed repositories directory");
     }
 
     /// remove the .gitspace directory
     pub fn rm_space(&self) {
-        let space_path = &self.get_path_as_string(PathType::Space);
+        let space_path = &self.get_path_as_string(&PathType::Space);
         remove_dir_all(&space_path).unwrap();
         println!("🧱 Removed .space directory");
     }
@@ -257,17 +256,15 @@ impl Config {
                 &self.ssh.host_name, &repo.namespace, &repo.project
             );
 
-            if Path::new(&self.get_path_as_string(PathType::Repositories)).exists() {
+            if Path::new(&self.get_path_as_string(&PathType::Repositories)).exists() {
                 if self.dir_is_empty(PathType::Repositories, &repo.project) {
                     let mut repo_dir = PathBuf::new();
-                    repo_dir.push(&self.get_path_as_string(PathType::Repositories));
+                    repo_dir.push(&self.get_path_as_string(&PathType::Repositories));
                     repo_dir.push(&repo.project);
 
                     println!("🧱 Cloning {} into {}", &repo.project, &repo_dir.display());
                     let _ = Repository::clone(&repo_uri, &repo_dir).unwrap();
-
                     create_dir_all(&repo_dir).unwrap();
-
                     println!(
                         "🚀 Cloning {} into {}",
                         &repo_uri,
@@ -276,7 +273,7 @@ impl Config {
                     let mut builder = build::RepoBuilder::new();
                     builder.fetch_options(fetch_options);
                     builder.clone(&repo_uri, &repo_dir).unwrap();
-                } 
+                }
                 // else {
                 //     println!("🧱 {} already exists", &repo.project);
                 //     println!("Pulling {}", &repo_uri);
@@ -353,7 +350,7 @@ mod tests {
         let config = Config::new();
         let _ = &config.write_config();
         // exists checks the path stored on Config; ie. ".gitspace"
-        let config_exists = config.exists(PathType::Config);
+        let config_exists = config.exists(&PathType::Config);
         assert!(config_exists);
 
         // Comment this out to toggle the removal of the .space directory
@@ -366,7 +363,8 @@ mod tests {
     fn config_to_json() {
         // WARN: This could fail on other systems (eg. Windows) since default will change the home dir
         // If this test fails, can simply ignore
-        let key_path = get_key_path();
+        let config_default = Config::default();
+        let key_path = &config_default.get_path_as_string(&PathType::Key);
         let config_raw = Config {
             paths: Paths {
                 space: String::from(GITSPACE),
@@ -377,7 +375,7 @@ mod tests {
                 host: "github".to_string(),
                 host_name: "github.com".to_string(),
                 user: "git".to_string(),
-                identity_file: key_path,
+                identity_file: String::from(key_path),
             },
             repositories: vec![
                 Repo {
@@ -395,34 +393,28 @@ mod tests {
             },
         };
 
-        let config_default_json = Config::default().to_json();
+        let config_default_json = config_default.to_json();
         assert_eq!(config_default_json, config_raw.to_json());
     }
     #[test]
     fn get_space_path() {
         let config = Config::default();
-        let space_path = &config.get_path_as_string(PathType::Space);
+        let space_path = &config.get_path_as_string(&PathType::Space);
         assert_eq!(space_path.as_str(), GITSPACE);
     }
     #[test]
     fn get_config_path() {
         let config = Config::default();
-        let config_path = &config.get_path_as_string(PathType::Config);
+        let config_path = &config.get_path_as_string(&PathType::Config);
         assert_eq!(config_path.as_str(), format!("{}/{}", GITSPACE, CONFIG));
     }
     #[test]
     fn get_repositories_path() {
         let config = Config::default();
-        let repositories_path = &config.get_path_as_string(PathType::Repositories);
+        let repositories_path = &config.get_path_as_string(&PathType::Repositories);
         assert_eq!(
             repositories_path.as_str(),
             format!("{}/{}", GITSPACE, REPOS)
         );
-    }
-    #[test]
-    fn get_ssh_key_path() {
-        let config = Config::default();
-        let ssh_key_path = &config.get_path_as_string(PathType::Key);
-        assert_eq!(ssh_key_path.as_str(), get_key_path());
     }
 }
