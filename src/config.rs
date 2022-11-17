@@ -1,6 +1,6 @@
 // System dependencies
 use dirs::home_dir;
-use std::fs::{create_dir_all, remove_dir_all, remove_file, write, File};
+use std::fs::{create_dir_all, read_dir, remove_dir_all, remove_file, write, File};
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
@@ -141,29 +141,14 @@ impl Config {
         // println!("{:?}", config_path);
         let repositories_path = format!("{}/{}", &self.paths.space, &self.paths.repositories);
         // println!("{:?}", repositories_path);
-
-        // let key_name = Config::read_config_raw(Path::new(&config_path))
-        //     .ssh
-        //     .identity_file
-        //     .to_string();
-
-        // let key_path: PathBuf = PathBuf::new();
-        // key_path
-        //     .join(home_dir().unwrap())
-        //     .join(".ssh")
-        //     .join(key_name)
-        //     .to_str()
-        //     .unwrap();
         let key_path = &self.ssh.identity_file;
-
         // println!("{:?}", key_path);
-        let requested_path = match path_type {
+        match path_type {
             PathType::Space => space_path,
             PathType::Config => config_path,
             PathType::Repositories => repositories_path,
             PathType::Key => key_path.to_owned(),
-        };
-        requested_path
+        }
     }
 
     /// Get a tuple of all common paths (space, config, repositories, key)
@@ -183,22 +168,43 @@ impl Config {
     fn exists(&self, path: &PathType) -> bool {
         let (space, config, repos, key) = &self.get_paths_as_strings();
         match path {
-            &PathType::Space => Path::new(space).exists(),
-            &PathType::Config => Path::new(config).exists(),
-            &PathType::Repositories => Path::new(repos).exists(),
-            &PathType::Key => Path::new(key).exists(),
+            PathType::Space => Path::new(space).exists(),
+            PathType::Config => Path::new(config).exists(),
+            PathType::Repositories => Path::new(repos).exists(),
+            PathType::Key => Path::new(key).exists(),
         }
     }
 
-    fn dir_is_empty(&self, path_type: PathType, repo_dir: &str) -> bool {
-        let dir = PathBuf::from(&self.get_path_as_string(&path_type))
-            .join(&repo_dir)
-            .read_dir()
-            .unwrap()
-            .next()
-            .is_none();
-        dir
+    //TODO: Figure out why getting a no such file or directory when calling this from clone_repos
+    fn dir_is_empty(&self, path_type: &PathType, repo_dir: &str) -> bool {
+        println!("repo_dir {:?}", repo_dir);
+        let path = match path_type {
+            PathType::Space => self.get_path_as_string(&PathType::Space),
+            PathType::Config => self.get_path_as_string(&PathType::Config),
+            PathType::Repositories => self.get_path_as_string(&PathType::Repositories),
+            PathType::Key => self.get_path_as_string(&PathType::Key),
+        };
+        let repo_path = format!("{}/{}", path, repo_dir);
+        let repo_path = Path::new(&repo_path);
+        // println!("{:?}", repo_path);
+        if repo_path.exists() {
+            let mut entries = match repo_path.read_dir() {
+                Ok(entries) => entries,
+                Err(_) => return false,
+            };
+            entries.next().is_none()
+        } else {
+            false
+        }
     }
+    //     let dir = PathBuf::from(&self.get_path_as_string(&path_type)).join(&repo_dir);
+    //     println!("{:?}", dir);
+    //     if dir.is_dir() {
+    //        let dir_status = read_dir(dir).expect("Could not find directory").next().unwrap();
+    //         println!("{:?}", dir_status);
+    //         dir_status
+    //     }
+    // }
 
     /// Return a JSON value of the config.json file
     // fn read_config_json(config_path: &Path) -> Value {
@@ -243,27 +249,30 @@ impl Config {
     pub fn clone_repos(&self, key_path: &Path) {
         self.repositories.iter().for_each(|repo| {
             // Instantiate buider for cloning, callbacks for processing credentials/auth request
-            let mut callbacks = RemoteCallbacks::new();
-            callbacks.credentials(|_url, username_from_url, _allowed_types| {
-                Cred::ssh_key(username_from_url.unwrap(), None, key_path, None)
-            });
-            let mut fetch_options = FetchOptions::new();
-            let _ = &fetch_options.remote_callbacks(callbacks);
-
-            // println!("repo.project: {}", &repo.project);
-            let repo_uri = format!(
-                "git@{}:{}/{}",
-                &self.ssh.host_name, &repo.namespace, &repo.project
-            );
-
+            println!("🧱 repo.project: {:?}", &repo.project);
             if Path::new(&self.get_path_as_string(&PathType::Repositories)).exists() {
-                if self.dir_is_empty(PathType::Repositories, &repo.project) {
+                println!("👀 repo exists");
+                if !self.dir_is_empty(&PathType::Repositories, &repo.project) {
+                    let mut callbacks = RemoteCallbacks::new();
+                    callbacks.credentials(|_url, username_from_url, _allowed_types| {
+                        Cred::ssh_key(username_from_url.unwrap(), None, key_path, None)
+                    });
+                    let mut fetch_options = FetchOptions::new();
+                    let _ = &fetch_options.remote_callbacks(callbacks);
+
+                    // println!("repo.project: {}", &repo.project);
+                    let repo_uri = format!(
+                        "git@{}:{}/{}",
+                        &self.ssh.host_name, &repo.namespace, &repo.project
+                    );
+
+                    println!("👀 dir is empty");
                     let mut repo_dir = PathBuf::new();
                     repo_dir.push(&self.get_path_as_string(&PathType::Repositories));
                     repo_dir.push(&repo.project);
 
                     println!("🧱 Cloning {} into {}", &repo.project, &repo_dir.display());
-                    let _ = Repository::clone(&repo_uri, &repo_dir).unwrap();
+                    // let _ = Repository::clone(&repo_uri, &repo_dir).unwrap();
                     create_dir_all(&repo_dir).unwrap();
                     println!(
                         "🚀 Cloning {} into {}",
@@ -355,7 +364,7 @@ mod tests {
 
         // Comment this out to toggle the removal of the .space directory
         // config.rm_space();
-        // assert_eq!(config.exists(PathType::Space), false);
+        // assert_eq!(config.exists(&PathType::Space), false);
     }
 
     /// Creating a raw Config, converting it to a JSON Value, and then comparing it to Default Config type
