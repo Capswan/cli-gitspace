@@ -1,6 +1,7 @@
 //! Gitspace
 
 // System dependencies
+use std::fmt::{Display};
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
@@ -8,7 +9,7 @@ use std::path::Path;
 // CLI dependencies
 use clap::{Parser, Subcommand};
 mod config;
-use config::{Config, PathType, get_key_path};
+use config::{Config, PathType};
 
 #[derive(Debug, Parser)]
 #[clap(author, version, about)]
@@ -23,10 +24,21 @@ struct Arguments {
     cmd: SubCommand,
 }
 
+
 #[derive(Subcommand, Debug)]
 enum SubCommand {
-    Init,
-    Sync,
+    /// Generate a .space directory with default config.json
+    Init {},
+    /// Clone/update repositories specified in config.json
+    Sync {
+        // /TODO: Allow users to put -s ~/.ssh/key_path at the end of the command by
+        //migrating from CLI arg to Subcommand::Sync arg
+    },
+    /// Cleanup target path;
+    Clean {
+        #[clap(short, long)]
+        target: String,
+    },
 }
 
 fn main() {
@@ -38,25 +50,39 @@ fn main() {
             let _ = &config.write_config();
         }
         SubCommand::Sync {} => {
-            //TODO: Read config path from CLI flag if it exists, otherwise use Paths::default()
-            // let config_path = &config.get_path_as_string(PathType::Config);
+            //TODO: Write integration test to ensure config_file override works properly
             let config_path = &args
                 .config_file
-                .unwrap_or_else(|| config.get_path_as_string(PathType::Config));
+                .unwrap_or_else(|| config.get_path_as_string(&PathType::Config));
 
+            //TODO: Extract this into separate function so it can be used in other subcommands
+            //without needing to rely on the default Config object
             let config = Config::read_config_raw(Path::new(&config_path));
             println!("{:#?}", &config);
 
             println!("🧱 Config path: {:?}", &config_path);
-            let key_path = &args.ssh_key.unwrap_or_else(|| {
-                String::from(&config.ssh.identity_file)
-            });
+            //TODO: Write integration test to ensure ssh_key config.json override works properly
+            let key_path = &args
+                .ssh_key
+                .unwrap_or_else(|| String::from(&config.ssh.identity_file));
+                // .unwrap_or_else(|| String::from(&config.ssh.identity_file));
+
             println!("🧱 Key path: {:?}", key_path);
-            // let mut file = File::open(Path::new(key_path)).expect("File not found");
-            // let mut data = String::new();
-            // file.read_to_string(&mut data).expect("Error reading file");
-            // println!("🧱 Key content: {:?}", data);
-            config.clone_repos(Path::new(&key_path));
+            let _ = &config.clone_repos(Path::new(&key_path));
         }
+        SubCommand::Clean { target } => match target.as_str() {
+            "space" | "s" => {
+                let _ = &config.rm_space();
+            }
+            "config" | "c" => {
+                let _ = &config.rm_config();
+            }
+            "repositories" | "r" => {
+                let _ = &config.rm_repositories();
+            }
+            _ => {
+                let _ = &config.rm_repositories();
+            }
+        },
     }
 }
