@@ -294,6 +294,7 @@ impl Config {
                 //         .unwrap();
                 // }
             } else {
+                //TODO: Add the fetch case
                 println!("🧱 repositories directory does not exist. Please init first");
             }
         });
