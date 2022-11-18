@@ -1,14 +1,14 @@
-// System dependencies
+// use std::convert::From;
 use dirs::home_dir;
-use std::fs::{create_dir_all, read_dir, remove_dir_all, remove_file, write, File};
-use std::io::prelude::*;
-use std::io::BufReader;
-use std::path::{Path, PathBuf};
-
-// Feature dependencies
-use git2::{build, Cred, FetchOptions, RemoteCallbacks, Repository};
+use git2::{build, Cred, FetchOptions, RemoteCallbacks};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::env::{current_dir, var};
+use std::fs::{create_dir_all, read_dir, remove_dir_all, remove_file, write, File};
+use std::io::BufReader;
+use std::io::prelude::*;
+use std::path::{Path, PathBuf};
+use symlink::{remove_symlink_dir, symlink_dir};
 
 const GITSPACE: &str = ".space";
 const CONFIG: &str = "config.json";
@@ -48,7 +48,7 @@ pub struct Sync {
 pub struct Config {
     paths: Paths,
     pub ssh: Ssh,
-    repositories: Vec<Repo>,
+    pub repositories: Vec<Repo>,
     sync: Sync,
 }
 
@@ -67,7 +67,19 @@ pub enum PathType {
     Repositories,
     Key,
 }
+pub fn cwd() -> String {
+    if let Ok(current_dir) = current_dir() {
+        if let Some(current_dir_str) = current_dir.to_str() {
+            return current_dir_str.to_string();
+        }
+    }
 
+    if let Ok(pwd) = var("PWD") {
+        return pwd;
+    }
+
+    String::from('.')
+}
 impl Default for Paths {
     fn default() -> Self {
         Paths {
@@ -238,6 +250,38 @@ impl Config {
         println!("🧱 Removed repositories directory");
     }
 
+    /// create symlinks in cwd based on newly cloned repositories in ~/.space/repositories
+    /// return a vector of symlinks created
+    pub fn write_symlinks(repositories: &Vec<Repo>) -> Vec<(String, String)>{
+        let mut symlinks: Vec<(String, String)> = Vec::new();
+        repositories.iter().for_each(|repo| {
+            let (space_path, _, repos_path, _) = Config::default().get_paths_as_strings();
+            let project_src_path = format!("{}/{}", &repos_path, &repo.project);
+            // let project_dest_path = std::env::current_dir().unwrap().join(&repo.project).as_os_str().to_str().to_owned();
+            let project_dest_path = String::from(cwd());
+// "{&space_path}/"
+
+            println!("🧱 space_path: {}", &space_path);
+            println!("🧱 project_src_path: {}", &project_src_path);
+            println!("🧱 project_dest_path: {:#?}", &project_dest_path);
+            println!("🧱 repos_path: {}", &repos_path);
+
+            symlink_dir(&project_src_path, &project_dest_path).unwrap();
+
+            let src_and_dest_paths = (project_src_path, project_dest_path);
+            println!("🧱 src_and_dest_paths: {:?}", &src_and_dest_paths);
+            symlinks.push(src_and_dest_paths);
+        });
+        symlinks
+    }
+
+    /// remove the symlinks in current working directory
+    pub fn rm_symlinks(&self, target_dir: Option<String>) {
+        // get current working directory
+        let dir = target_dir.unwrap_or(cwd());
+        println!("🧱 Removing symlinks from {:?}", dir);
+    }
+
     /// remove the .gitspace directory
     pub fn rm_space(&self) {
         let space_path = &self.get_path_as_string(&PathType::Space);
@@ -272,7 +316,6 @@ impl Config {
                     repo_dir.push(&repo.project);
 
                     println!("🧱 Cloning {} into {}", &repo.project, &repo_dir.display());
-                    // let _ = Repository::clone(&repo_uri, &repo_dir).unwrap();
                     create_dir_all(&repo_dir).unwrap();
                     println!(
                         "🚀 Cloning {} into {}",
@@ -374,6 +417,7 @@ mod tests {
         // WARN: This could fail on other systems (eg. Windows) since default will change the home dir
         // If this test fails, can simply ignore
         let config_default = Config::default();
+
         let key_path = &config_default.get_path_as_string(&PathType::Key);
         let config_raw = Config {
             paths: Paths {
