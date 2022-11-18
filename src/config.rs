@@ -258,7 +258,7 @@ impl Config {
             let (space_path, _, repos_path, _) = Config::default().get_paths_as_strings();
             let project_src_path = format!("{}/{}", &repos_path, &repo.project);
             // let project_dest_path = std::env::current_dir().unwrap().join(&repo.project).as_os_str().to_str().to_owned();
-            let project_dest_path = String::from(cwd());
+            let project_dest_path = format!("{}/{}", String::from(cwd()), &repo.project);
 // "{&space_path}/"
 
             println!("🧱 space_path: {}", &space_path);
