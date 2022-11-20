@@ -257,30 +257,38 @@ impl Config {
         repositories.iter().for_each(|repo| {
             let (space_path, _, repos_path, _) = Config::default().get_paths_as_strings();
             let project_src_path = format!("{}/{}", &repos_path, &repo.project);
-            // let project_dest_path = std::env::current_dir().unwrap().join(&repo.project).as_os_str().to_str().to_owned();
             let project_dest_path = format!("{}/{}", String::from(cwd()), &repo.project);
-// "{&space_path}/"
 
-            println!("🧱 space_path: {}", &space_path);
-            println!("🧱 project_src_path: {}", &project_src_path);
-            println!("🧱 project_dest_path: {:#?}", &project_dest_path);
-            println!("🧱 repos_path: {}", &repos_path);
+            // println!("🧱 space_path: {}", &space_path);
+            // println!("🧱 project_src_path: {}", &project_src_path);
+            // println!("🧱 project_dest_path: {:#?}", &project_dest_path);
+            // println!("🧱 repos_path: {}", &repos_path);
 
             symlink_dir(&project_src_path, &project_dest_path).unwrap();
-
             let src_and_dest_paths = (project_src_path, project_dest_path);
-            println!("🧱 src_and_dest_paths: {:?}", &src_and_dest_paths);
+            // println!("🧱 src_and_dest_paths: {:?}", &src_and_dest_paths);
             symlinks.push(src_and_dest_paths);
         });
         symlinks
     }
 
     /// remove the symlinks in current working directory
-    pub fn rm_symlinks(&self, target_dir: Option<String>) {
-        // get current working directory
-        let dir = target_dir.unwrap_or(cwd());
-        println!("🧱 Removing symlinks from {:?}", dir);
-    }
+    //TODO: Debug 
+    // pub fn rm_symlinks(&self, target_dir: Option<String>) {
+    //     Path::new(target_dir.unwrap_or(cwd()).read_dir().unwrap().for_each(|entry| {
+    //         todo!();
+    //         // let entry = entry.unwrap();
+    //         // let path = entry.path();
+    //         // if path.is_dir() {
+    //         //     remove_dir_all(&path).unwrap();
+    //         // } else {
+    //         //     remove_file(&path).unwrap();
+    //         // }
+    //     }));
+    // }
+
+    /// Option -> Some() None() 
+    /// Result -> Ok() Err()
 
     /// remove the .gitspace directory
     pub fn rm_space(&self) {
