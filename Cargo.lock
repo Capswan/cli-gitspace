@@ -78,19 +78,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cli-gitspace"
-version = "0.0.1"
-dependencies = [
- "clap",
- "dirs",
- "git2",
- "serde",
- "serde_json",
- "symlink",
- "walkdir",
-]
-
-[[package]]
 name = "dirs"
 version = "4.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -143,6 +130,19 @@ dependencies = [
  "openssl-probe",
  "openssl-sys",
  "url",
+]
+
+[[package]]
+name = "gitspace"
+version = "0.0.1"
+dependencies = [
+ "clap",
+ "dirs",
+ "git2",
+ "serde",
+ "serde_json",
+ "symlink",
+ "walkdir",
 ]
 
 [[package]]
