@@ -1,6 +1,7 @@
 [package]
 name = "gitspace"
 authors = ["alechp"]
+description = "git-based tool to clone & symlink multiple repositories in one workspace"
 repository = "https://github.com/capswan/cli-gitspace"
 keywords = ["workspace", "git", "monolith", "clone", "symlink"]
 categories = ["command-line-utilities", "development-tools"]
