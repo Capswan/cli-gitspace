@@ -2,7 +2,7 @@
 name = "gitspace"
 authors = ["alechp"]
 repository = "https://github.com/capswan/cli-gitspace"
-keywords = ["workspace", "git", "submodules", "monolith", "clone", "symlink"]
+keywords = ["workspace", "git", "monolith", "clone", "symlink"]
 categories = ["command-line-utilities", "development-tools"]
 readme = "README.md"
 license = "MIT"
