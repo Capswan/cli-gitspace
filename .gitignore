@@ -1,2 +1,6 @@
+cli-*
 .space
 /target
+gs 
+#use `gs` sometimes to test generated cli bin without running cargo run --
+# ln -s ./target/debug/cli-gitspace gs

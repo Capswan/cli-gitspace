@@ -1,14 +1,15 @@
-// System dependencies
+// use std::convert::From;
 use dirs::home_dir;
+use git2::{build, Cred, FetchOptions, RemoteCallbacks};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use std::env::{current_dir, var};
 use std::fs::{create_dir_all, read_dir, remove_dir_all, remove_file, write, File};
 use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
-
-// Feature dependencies
-use git2::{build, Cred, FetchOptions, RemoteCallbacks, Repository};
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use symlink::{remove_symlink_dir, symlink_dir};
+use walkdir::{DirEntry, WalkDir};
 
 const GITSPACE: &str = ".space";
 const CONFIG: &str = "config.json";
@@ -34,6 +35,8 @@ pub struct Ssh {
 pub struct Repo {
     namespace: String,
     project: String,
+    // symlink: String,
+    // alias: String,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
@@ -48,7 +51,7 @@ pub struct Sync {
 pub struct Config {
     paths: Paths,
     pub ssh: Ssh,
-    repositories: Vec<Repo>,
+    pub repositories: Vec<Repo>,
     sync: Sync,
 }
 
@@ -67,7 +70,19 @@ pub enum PathType {
     Repositories,
     Key,
 }
+pub fn cwd() -> String {
+    if let Ok(current_dir) = current_dir() {
+        if let Some(current_dir_str) = current_dir.to_str() {
+            return current_dir_str.to_string();
+        }
+    }
 
+    if let Ok(pwd) = var("PWD") {
+        return pwd;
+    }
+
+    String::from('.')
+}
 impl Default for Paths {
     fn default() -> Self {
         Paths {
@@ -197,14 +212,6 @@ impl Config {
             false
         }
     }
-    //     let dir = PathBuf::from(&self.get_path_as_string(&path_type)).join(&repo_dir);
-    //     println!("{:?}", dir);
-    //     if dir.is_dir() {
-    //        let dir_status = read_dir(dir).expect("Could not find directory").next().unwrap();
-    //         println!("{:?}", dir_status);
-    //         dir_status
-    //     }
-    // }
 
     /// Return a JSON value of the config.json file
     // fn read_config_json(config_path: &Path) -> Value {
@@ -236,6 +243,44 @@ impl Config {
         let repositories_path = &self.get_path_as_string(&PathType::Repositories);
         remove_dir_all(&repositories_path).unwrap();
         println!("🧱 Removed repositories directory");
+    }
+
+    /// create symlinks in cwd based on newly cloned repositories in ~/.space/repositories
+    /// return a vector of symlinks created
+    pub fn write_symlinks(repositories: &Vec<Repo>) -> Vec<(String, String)> {
+        let mut symlinks: Vec<(String, String)> = Vec::new();
+        repositories.iter().for_each(|repo| {
+            let (space_path, _, repos_path, _) = Config::default().get_paths_as_strings();
+            let project_src_path = format!("{}/{}", &repos_path, &repo.project);
+            let project_dest_path = format!("{}/{}", String::from(cwd()), &repo.project);
+
+            // println!("🧱 space_path: {}", &space_path);
+            // println!("🧱 project_src_path: {}", &project_src_path);
+            // println!("🧱 project_dest_path: {:#?}", &project_dest_path);
+            // println!("🧱 repos_path: {}", &repos_path);
+
+            symlink_dir(&project_src_path, &project_dest_path).unwrap();
+            let src_and_dest_paths = (project_src_path, project_dest_path);
+            // println!("🧱 src_and_dest_paths: {:?}", &src_and_dest_paths);
+            symlinks.push(src_and_dest_paths);
+        });
+        symlinks
+    }
+
+    pub fn rm_symlinks(&self) {
+        // let mut removed_symlinks: Vec<String> = Vec::new();
+        let entries = match Path::new(&cwd()).read_dir() {
+            Ok(entries) => entries,
+            Err(_) => return,
+        };
+        for entry in entries {
+            let path = entry.unwrap().path();
+            if path.is_symlink() {
+                //TODO: Only remove symlinks if they match the project name in the config.json file
+                println!("🧱 Removing symlink: {:?}", path);
+               remove_file(&path).unwrap(); 
+            }
+        }
     }
 
     /// remove the .gitspace directory
@@ -272,7 +317,6 @@ impl Config {
                     repo_dir.push(&repo.project);
 
                     println!("🧱 Cloning {} into {}", &repo.project, &repo_dir.display());
-                    // let _ = Repository::clone(&repo_uri, &repo_dir).unwrap();
                     create_dir_all(&repo_dir).unwrap();
                     println!(
                         "🚀 Cloning {} into {}",
@@ -374,6 +418,7 @@ mod tests {
         // WARN: This could fail on other systems (eg. Windows) since default will change the home dir
         // If this test fails, can simply ignore
         let config_default = Config::default();
+
         let key_path = &config_default.get_path_as_string(&PathType::Key);
         let config_raw = Config {
             paths: Paths {
@@ -391,10 +436,14 @@ mod tests {
                 Repo {
                     namespace: "capswan".to_string(),
                     project: "cli-gitspace".to_string(),
+                    // alias: "gsp".to_string(),
+                    // symlink: "cli-gitspace".to_string(),
                 },
                 Repo {
                     namespace: "capswan".to_string(),
                     project: "cli-ftr".to_string(),
+                    // alias: "ftr".to_string(),
+                    // symlink: "cli-ftr".to_string(),
                 },
             ],
             sync: Sync {

@@ -1,12 +1,8 @@
 //! Gitspace
-
-// System dependencies
 use std::fmt::{Display};
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::Path;
-
-// CLI dependencies
 use clap::{Parser, Subcommand};
 mod config;
 use config::{Config, PathType};
@@ -34,15 +30,21 @@ enum SubCommand {
         // /TODO: Allow users to put -s ~/.ssh/key_path at the end of the command by
         //migrating from CLI arg to Subcommand::Sync arg
     },
-    /// Cleanup target path;
+    /// Cleanup target path; defaults to cleaning up repositories directory
     Clean {
         #[clap(short, long)]
         target: String,
     },
+    Symlink {}
 }
 
 fn main() {
     let args = Arguments::parse();
+    //TODO: Remove config.json and .space path as options from config.json (Paths struct); easier to just assume
+    //those paths; if user changes the config.json path has changed how would we read it anyways
+    //unless they specify the --config_path everytime? And if they did, would we implement caching
+    //to update the config with the new path? Could make sense, but for now targeting the golden
+    //path case of "I run gitspace init && gitspace sync and it just works"
     let config = Config::new();
     match &args.cmd {
         SubCommand::Init {} => {
@@ -70,6 +72,12 @@ fn main() {
             println!("🧱 Key path: {:?}", key_path);
             let _ = &config.clone_repos(Path::new(&key_path));
         }
+        SubCommand::Symlink {} => {
+            //TODO: Allow users to specify a target symlink directory, default to CWD as root.
+            //Update Paths struct to include symlink path
+
+            let _ = Config::write_symlinks(&config.repositories);
+        }
         SubCommand::Clean { target } => match target.as_str() {
             "space" | "s" => {
                 let _ = &config.rm_space();
@@ -78,7 +86,13 @@ fn main() {
                 let _ = &config.rm_config();
             }
             "repositories" | "r" => {
+                //TODO: Check nested directories for whether git directories have any uncommitted changes before removing
                 let _ = &config.rm_repositories();
+            }
+            "symlinks" | "l" => {
+                //TODO: Allow user to specify location of symlinks with a new flag on the Clean
+                //subcommand
+                let _ = &config.rm_symlinks();
             }
             _ => {
                 let _ = &config.rm_repositories();
