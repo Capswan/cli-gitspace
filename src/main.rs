@@ -76,7 +76,7 @@ fn main() {
             //TODO: Allow users to specify a target symlink directory, default to CWD as root.
             //Update Paths struct to include symlink path
 
-            Config::write_symlinks(&config.repositories);
+            let _ = Config::write_symlinks(&config.repositories);
         }
         SubCommand::Clean { target } => match target.as_str() {
             "space" | "s" => {
@@ -92,7 +92,7 @@ fn main() {
             "symlinks" | "l" => {
                 //TODO: Allow user to specify location of symlinks with a new flag on the Clean
                 //subcommand
-                let _ = &config.rm_symlinks(None);
+                let _ = &config.rm_symlinks();
             }
             _ => {
                 let _ = &config.rm_repositories();

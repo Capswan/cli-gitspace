@@ -5,10 +5,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::env::{current_dir, var};
 use std::fs::{create_dir_all, read_dir, remove_dir_all, remove_file, write, File};
-use std::io::BufReader;
 use std::io::prelude::*;
+use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use symlink::{remove_symlink_dir, symlink_dir};
+use walkdir::{DirEntry, WalkDir};
 
 const GITSPACE: &str = ".space";
 const CONFIG: &str = "config.json";
@@ -34,6 +35,8 @@ pub struct Ssh {
 pub struct Repo {
     namespace: String,
     project: String,
+    // symlink: String,
+    // alias: String,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
@@ -209,14 +212,6 @@ impl Config {
             false
         }
     }
-    //     let dir = PathBuf::from(&self.get_path_as_string(&path_type)).join(&repo_dir);
-    //     println!("{:?}", dir);
-    //     if dir.is_dir() {
-    //        let dir_status = read_dir(dir).expect("Could not find directory").next().unwrap();
-    //         println!("{:?}", dir_status);
-    //         dir_status
-    //     }
-    // }
 
     /// Return a JSON value of the config.json file
     // fn read_config_json(config_path: &Path) -> Value {
@@ -252,7 +247,7 @@ impl Config {
 
     /// create symlinks in cwd based on newly cloned repositories in ~/.space/repositories
     /// return a vector of symlinks created
-    pub fn write_symlinks(repositories: &Vec<Repo>) -> Vec<(String, String)>{
+    pub fn write_symlinks(repositories: &Vec<Repo>) -> Vec<(String, String)> {
         let mut symlinks: Vec<(String, String)> = Vec::new();
         repositories.iter().for_each(|repo| {
             let (space_path, _, repos_path, _) = Config::default().get_paths_as_strings();
@@ -272,23 +267,21 @@ impl Config {
         symlinks
     }
 
-    /// remove the symlinks in current working directory
-    //TODO: Debug 
-    // pub fn rm_symlinks(&self, target_dir: Option<String>) {
-    //     Path::new(target_dir.unwrap_or(cwd()).read_dir().unwrap().for_each(|entry| {
-    //         todo!();
-    //         // let entry = entry.unwrap();
-    //         // let path = entry.path();
-    //         // if path.is_dir() {
-    //         //     remove_dir_all(&path).unwrap();
-    //         // } else {
-    //         //     remove_file(&path).unwrap();
-    //         // }
-    //     }));
-    // }
-
-    /// Option -> Some() None() 
-    /// Result -> Ok() Err()
+    pub fn rm_symlinks(&self) {
+        // let mut removed_symlinks: Vec<String> = Vec::new();
+        let entries = match Path::new(&cwd()).read_dir() {
+            Ok(entries) => entries,
+            Err(_) => return,
+        };
+        for entry in entries {
+            let path = entry.unwrap().path();
+            if path.is_symlink() {
+                //TODO: Only remove symlinks if they match the project name in the config.json file
+                println!("🧱 Removing symlink: {:?}", path);
+               remove_file(&path).unwrap(); 
+            }
+        }
+    }
 
     /// remove the .gitspace directory
     pub fn rm_space(&self) {
@@ -443,10 +436,14 @@ mod tests {
                 Repo {
                     namespace: "capswan".to_string(),
                     project: "cli-gitspace".to_string(),
+                    // alias: "gsp".to_string(),
+                    // symlink: "cli-gitspace".to_string(),
                 },
                 Repo {
                     namespace: "capswan".to_string(),
                     project: "cli-ftr".to_string(),
+                    // alias: "ftr".to_string(),
+                    // symlink: "cli-ftr".to_string(),
                 },
             ],
             sync: Sync {
