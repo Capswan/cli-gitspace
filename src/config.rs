@@ -9,7 +9,6 @@ use std::io::prelude::*;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
 use symlink::{remove_symlink_dir, symlink_dir};
-use walkdir::{DirEntry, WalkDir};
 
 const GITSPACE: &str = ".space";
 const CONFIG: &str = "config.json";
@@ -248,6 +247,7 @@ impl Config {
     /// create symlinks in cwd based on newly cloned repositories in ~/.space/repositories
     /// return a vector of symlinks created
     pub fn write_symlinks(repositories: &Vec<Repo>) -> Vec<(String, String)> {
+        //TODO: Add a check to see if the symlink already exists
         let mut symlinks: Vec<(String, String)> = Vec::new();
         repositories.iter().for_each(|repo| {
             let (space_path, _, repos_path, _) = Config::default().get_paths_as_strings();
